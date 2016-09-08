@@ -149,6 +149,46 @@ func duration2str(dur time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
+func startTimer(pid int) error {
+	data := map[string]interface{}{
+		"time_entry": map[string]interface{}{
+			"pid":          pid,
+			"description":  "",
+			"created_with": "toggl",
+		},
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	if err := enc.Encode(data); err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/start", baseURL)
+	if _, err := APICall("POST", url, &buf); err != nil {
+		return err
+	}
+	return nil
+}
+
+func stopTimer(id int) (time.Duration, error) {
+	url := fmt.Sprintf("%s/%d/stop", baseURL, id)
+	resp, err := APICall("PUT", url, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	var reply struct {
+		Data struct {
+			Duration int `json:"duration"`
+		}
+	}
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&reply); err != nil {
+		return 0, err
+	}
+	dur := time.Duration(time.Duration(reply.Data.Duration) * time.Second)
+	return dur, err
+}
+
 func main() {
 	log.SetFlags(0) // Don't prefix with time
 	flag.Usage = func() {
@@ -190,42 +230,17 @@ func main() {
 		default:
 			log.Fatalf("error: too project many matches to %s", name)
 		}
-		data := map[string]interface{}{
-			"time_entry": map[string]interface{}{
-				"pid":          ids[0],
-				"description":  "",
-				"created_with": "toggl",
-			},
-		}
-		var buf bytes.Buffer
-		enc := json.NewEncoder(&buf)
-		if err := enc.Encode(data); err != nil {
-			log.Fatalf("error: can't encode - %s", err)
-		}
-		url := fmt.Sprintf("%s/start", baseURL)
-		if _, err := APICall("POST", url, &buf); err != nil {
-			log.Fatalf("error: can't start - %s", err)
+		if err := startTimer(ids[0]); err != nil {
+			log.Fatalf("error: can't start timer - %s", err)
 		}
 	case "stop":
 		if curTimer == nil {
 			log.Fatalf("error: no timer running")
 		}
-		url := fmt.Sprintf("%s/%d/stop", baseURL, curTimer.ID)
-		resp, err := APICall("PUT", url, nil)
+		dur, err := stopTimer(curTimer.ID)
 		if err != nil {
-			log.Fatalf("error: can't stop - %s", err)
+			log.Fatalf("error: can't stop timer - %s", err)
 		}
-		defer resp.Body.Close()
-		var reply struct {
-			Data struct {
-				Duration int `json:"duration"`
-			}
-		}
-		dec := json.NewDecoder(resp.Body)
-		if err := dec.Decode(&reply); err != nil {
-			log.Fatalf("error: can't decode reply - %s", err)
-		}
-		dur := time.Duration(time.Duration(reply.Data.Duration) * time.Second)
 		fmt.Printf("%s\n", duration2str(dur))
 	case "status":
 		if curTimer == nil {
@@ -234,5 +249,4 @@ func main() {
 		dur := time.Now().UTC().Sub(curTimer.Start)
 		fmt.Printf("duration: %s\n", duration2str(dur))
 	}
-
 }
