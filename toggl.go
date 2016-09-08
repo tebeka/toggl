@@ -19,6 +19,8 @@ import (
 const (
 	// APIBase is the base rest API URL
 	APIBase = "https://www.toggl.com/api/v8"
+	// Version is current version
+	Version = "0.1.0"
 )
 
 var (
@@ -191,12 +193,20 @@ func stopTimer(id int) (time.Duration, error) {
 
 func main() {
 	log.SetFlags(0) // Don't prefix with time
+	var showVersion bool
+	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Usage = func() {
 		name := path.Base(os.Args[0])
-		fmt.Printf("usage: %s [start <project>|stop|status|projects]\n", name)
+		fmt.Printf("usage: %s start <project>|stop|status|projects\n", name)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("%s\n", Version)
+		os.Exit(0)
+	}
+
 	if err := checkArgs(); err != nil {
 		log.Fatalf("error: %s", err)
 	}
