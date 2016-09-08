@@ -18,7 +18,7 @@ If you have the Go SDK then
 
     go get github.com/tebeka/toggl
 
-Or you can download the binary from the [release section](https://github.com/tebeka/toggl/releases)
+Or you can download the binary from the [release section](https://github.com/tebeka/toggl/releases).
 
 ## Licence
 BSD
