@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/user"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -151,7 +152,8 @@ func duration2str(dur time.Duration) string {
 func main() {
 	log.SetFlags(0) // Don't prefix with time
 	flag.Usage = func() {
-		fmt.Printf("usage: %s [start <project>|stop|status|projects]")
+		name := path.Base(os.Args[0])
+		fmt.Printf("usage: %s [start <project>|stop|status|projects]\n", name)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
