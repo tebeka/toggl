@@ -1,6 +1,6 @@
 # toggle - Simple toggl command line
 
-This is a simple command line to start/stop timers on [toggl](toggl.com/app/timer). I scratched an itch, hope you'll find it useful.
+This is a simple command line to start/stop timers on [toggl](https://toggl.com/). I scratched an itch, hope you'll find it useful.
 
 ## Usage
 
