@@ -3,7 +3,7 @@ os=$(shell go env GOOS)
 arch=$(shell go env GOARCH)
 
 build:
-	GOOS=drawin go build
+	GOOS=darwin go build
 	bzip2 -c toggl > toggl-$(version)-darwin-$(arch).bz2
 	go build
 	bzip2 -c toggl > toggl-$(version)-$(os)-$(arch).bz2
