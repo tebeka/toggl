@@ -1,6 +1,7 @@
 # toggle - Simple toggl command line
 
-This is a simple command line to start/stop timers on [toggl](https://toggl.com/). I scratched an itch, hope you'll find it useful.
+This is a simple command line to start/stop timers on
+[toggl](https://toggl.com/). I scratched an itch, hope you'll find it useful.
 
 ## Usage
 
@@ -18,14 +19,12 @@ If you have the Go SDK then
 
     go get github.com/tebeka/toggl
 
-Or you can download the binary from the [release section](https://github.com/tebeka/toggl/releases).
+Or you can download a binary from the [release
+section](https://github.com/tebeka/toggl/releases).
 
 ## Licence
-BSD
+[BSD](LICENCE)
 
 ## Contact, Bugs ...
 
 https://github.com/tebeka/toggl
-
-
-## 
