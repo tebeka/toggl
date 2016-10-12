@@ -147,7 +147,7 @@ func checkArgs() error {
 }
 
 func duration2str(dur time.Duration) string {
-	h, m, s := int(dur.Hours()), int(dur.Minutes()/60.0), int(dur.Seconds())%60
+	h, m, s := int(dur.Hours()), int(dur.Minutes())%60, int(dur.Seconds())%60
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
@@ -256,7 +256,7 @@ func main() {
 		if curTimer == nil {
 			log.Fatalf("error: no timer running")
 		}
-		dur := time.Now().UTC().Sub(curTimer.Start)
+		dur := time.Since(curTimer.Start)
 		fmt.Printf("duration: %s\n", duration2str(dur))
 	}
 }
