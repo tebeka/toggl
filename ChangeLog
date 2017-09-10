@@ -1,2 +1,5 @@
+2017-09-10 version 0.1.2
+* Fix error message when no arguments given
+
 2016-10-12 version 0.1.1
-    * Fix duration display
+* Fix duration display
