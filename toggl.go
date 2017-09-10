@@ -20,7 +20,8 @@ const (
 	// APIBase is the base rest API URL
 	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
-	Version = "0.1.2"
+	Version  = "0.1.2"
+	rcEnvKey = "TOGGLRC"
 )
 
 var (
@@ -43,13 +44,25 @@ type Timer struct {
 	Start time.Time `json:"start"`
 }
 
-func loadConfig() error {
+func configFile() (string, error) {
+	path := os.Getenv(rcEnvKey)
+	if len(path) > 0 {
+		return path, nil
+	}
 	user, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/.togglrc", user.HomeDir), nil
+}
+
+func loadConfig() error {
+	fname, err := configFile()
 	if err != nil {
 		return err
 	}
 
-	fname := fmt.Sprintf("%s/.togglrc", user.HomeDir)
 	file, err := os.Open(fname)
 	if err != nil {
 		return err
@@ -258,7 +271,7 @@ func main() {
 		fmt.Printf("%s\n", duration2str(dur))
 	case "status":
 		if curTimer == nil {
-			log.Fatalf("error: no timer running")
+			fmt.Println("no timer is running")
 		}
 		dur := time.Since(curTimer.Start)
 		fmt.Printf("duration: %s\n", duration2str(dur))
