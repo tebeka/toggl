@@ -272,6 +272,7 @@ func main() {
 	case "status":
 		if curTimer == nil {
 			fmt.Println("no timer is running")
+			return
 		}
 		dur := time.Since(curTimer.Start)
 		fmt.Printf("duration: %s\n", duration2str(dur))
