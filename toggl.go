@@ -20,7 +20,7 @@ const (
 	// APIBase is the base rest API URL
 	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
-	Version = "0.1.1"
+	Version = "0.1.2"
 )
 
 var (
@@ -131,6 +131,10 @@ func findProject(name string, prjs []Project) []int {
 }
 
 func checkArgs() error {
+	if flag.NArg() == 0 {
+		return fmt.Errorf("missing argument")
+	}
+
 	switch flag.Arg(0) {
 	case "start":
 		if flag.NArg() != 2 {
