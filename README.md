@@ -10,7 +10,7 @@ This is a simple command line to start/stop timers on
       -version
             show version and exit
 
-You'll need a `~/.togglrc` with your API key and project id. See an example
+You'll need a `~/.togglrc` with your API key and workspace id. See an example
 [here](togglrc-example).
 
 ## Installing
