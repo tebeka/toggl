@@ -1,138 +1,282 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"flag"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
-	"os/user"
-	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/olebedev/when"
+	"github.com/olebedev/when/rules/common"
+	"github.com/olebedev/when/rules/en"
+	"github.com/tebeka/toggl/togglv8"
+	"github.com/urfave/cli"
 )
 
 const (
-	// APIBase is the base rest API URL
-	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
 	Version  = "0.1.2"
 	rcEnvKey = "TOGGLRC"
 )
 
 var (
-	baseURL = fmt.Sprintf("%s/time_entries", APIBase)
-	config  struct {
+	config struct {
 		APIToken  string `json:"api_token"`
 		Workspace string `json:"workspace"`
 	}
 )
 
-// Project is toggl project
-type Project struct {
-	Name string `json:"name"`
-	ID   int    `json:"id"`
-}
+func main() {
+	app := cli.NewApp()
+	app.Name = "toggl"
+	app.Version = Version
+	app.Usage = "Time tracking app CLI."
 
-// Timer is a toggle running timer
-type Timer struct {
-	ID    int       `json:"id"`
-	Start time.Time `json:"start"`
-}
-
-func configFile() (string, error) {
-	path := os.Getenv(rcEnvKey)
-	if len(path) > 0 {
-		return path, nil
+	if err := loadConfig(); err != nil {
+		log.Fatalf("error: can't load config - %s", err)
 	}
-	user, err := user.Current()
+
+	tc := togglv8.New(config.APIToken, config.Workspace)
+
+	// Support for parsing natural language of time.
+	w := when.New(nil)
+	w.Add(en.All...)
+	w.Add(common.All...)
+
+	app.Commands = []cli.Command{
+		{
+			Name:  "start",
+			Usage: "Start timer",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "description",
+					Usage: "Description for the entry",
+				},
+				cli.StringFlag{
+					Name:  "at",
+					Value: "now",
+					Usage: "When to start the timer",
+				},
+				cli.StringFlag{
+					Name:  "stop",
+					Usage: "When to stop the timer",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				curTimer, err := tc.CurrentTimer()
+				if err != nil {
+					return err
+				}
+
+				if curTimer != nil {
+					return fmt.Errorf("error: there is a timer running")
+				}
+
+				prjs, err := tc.Projects()
+				if err != nil {
+					return err
+				}
+
+				if c.NArg() != 1 {
+					return fmt.Errorf("wrong number of arguments")
+				}
+
+				name := c.Args().First()
+				ids := findProject(name, prjs)
+
+				startTime, err := w.Parse(c.String("at"), time.Now())
+				if err != nil || startTime == nil {
+					return fmt.Errorf("error: failed to parse flag '--at'")
+				}
+
+				st, err := w.Parse(c.String("stop"), time.Now())
+				if err != nil {
+					return fmt.Errorf("error: failed to parse flag '--stop'")
+				}
+
+				var stopTime *time.Time
+				if st != nil {
+					stopTime = &st.Time
+				}
+
+				switch len(ids) {
+				case 0:
+					return fmt.Errorf("error: no project match %s", name)
+				case 1:
+				default:
+					return fmt.Errorf("error: too project many matches to %s", name)
+				}
+
+				te, err := tc.StartTimer(ids[0], startTime.Time, stopTime, c.String("description"))
+				if err != nil {
+					return fmt.Errorf("error: can't start timer - %s", err)
+				}
+
+				fmt.Printf("started timer at %s\n", te.Start.Format(time.Stamp))
+				return nil
+			},
+		},
+		{
+			Name:  "stop",
+			Usage: "Stop timer",
+			Action: func(c *cli.Context) error {
+				curTimer, err := tc.CurrentTimer()
+				if err != nil {
+					return err
+				}
+
+				if curTimer == nil {
+					return fmt.Errorf("error: no timer running")
+				}
+
+				dur, err := tc.StopTimer(curTimer.ID)
+				if err != nil {
+					return fmt.Errorf("error: can't stop timer - %s", err)
+				}
+
+				fmt.Printf("%s\n", duration2str(dur))
+
+				return nil
+			},
+		},
+		{
+			Name:  "status",
+			Usage: "Status of current timer",
+			Action: func(c *cli.Context) error {
+				curTimer, err := tc.CurrentTimer()
+				if err != nil {
+					return err
+				}
+
+				if curTimer == nil {
+					return fmt.Errorf("error: no timer running")
+				}
+
+				dur := time.Since(curTimer.Start)
+				fmt.Printf("duration: %s\n", duration2str(dur))
+
+				return nil
+			},
+		},
+		{
+			Name:  "projects",
+			Usage: "List projects",
+			Action: func(c *cli.Context) error {
+				prjs, err := tc.Projects()
+				if err != nil {
+					return err
+				}
+
+				var names []string
+				for _, prj := range prjs {
+					names = append(names, prj.Name)
+				}
+
+				sort.Strings(names)
+				for _, name := range names {
+					fmt.Printf("* %s\n", name)
+				}
+
+				return nil
+			},
+		},
+		{
+			Name:  "entries",
+			Usage: "Time entries for the past 9 days",
+			Action: func(c *cli.Context) error {
+				prjs, err := tc.Projects()
+				if err != nil {
+					return err
+				}
+
+				// Map the projects up to be able to display
+				// the names.
+				projects := make(map[int]string, 0)
+				for _, p := range prjs {
+					projects[p.ID] = p.Name
+				}
+
+				entries, err := tc.Timers()
+				if err != nil {
+					return err
+				}
+
+				for _, entry := range entries {
+					var ongoing bool
+
+					duration := time.Duration(time.Duration(entry.Duration) * time.Second)
+					if duration < 0 {
+						ongoing = true
+						duration = time.Since(entry.Start)
+					}
+
+					fmt.Printf(
+						"* %s - %s > %s",
+						entry.Start.Format(time.Stamp),
+						entry.Stop.Format(time.Stamp),
+						duration2str(duration),
+					)
+
+					fmt.Printf(" | %s", projects[entry.PID])
+
+					if ongoing {
+						fmt.Printf(" [running]")
+					}
+
+					if entry.Description != "" {
+						fmt.Printf(": %s", entry.Description)
+					}
+
+					fmt.Println()
+				}
+
+				return nil
+			},
+		},
+		{
+			Name:  "week",
+			Usage: "Duration of all entries this week",
+			Action: func(c *cli.Context) error {
+				entries, err := tc.Timers()
+				if err != nil {
+					return err
+				}
+
+				var durationSum time.Duration
+				_, thisWeek := time.Now().ISOWeek()
+
+				for _, entry := range entries {
+					_, weekStart := entry.Start.ISOWeek()
+					// _, weekStop := entry.Start.ISOWeek() XXX only care about started for now
+
+					if weekStart != thisWeek {
+						continue
+					}
+
+					duration := time.Duration(time.Duration(entry.Duration) * time.Second)
+					if duration < 0 {
+						duration = time.Since(entry.Start)
+					}
+
+					durationSum += duration
+				}
+
+				fmt.Println(duration2str(durationSum))
+
+				return nil
+			},
+		},
+	}
+
+	err := app.Run(os.Args)
 	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s/.togglrc", user.HomeDir), nil
-}
-
-func loadConfig() error {
-	fname, err := configFile()
-	if err != nil {
-		return err
-	}
-
-	file, err := os.Open(fname)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	dec := json.NewDecoder(file)
-	if err := dec.Decode(&config); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// APICall makes an API call with right credentials
-func APICall(method, url string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		return nil, err
-	}
-	req.SetBasicAuth(config.APIToken, "api_token")
-	return http.DefaultClient.Do(req)
-}
-
-func getProjects() ([]Project, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/projects", APIBase, config.Workspace)
-	resp, err := APICall("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	dec := json.NewDecoder(resp.Body)
-	var prjs []Project
-	if err := dec.Decode(&prjs); err != nil {
-		return nil, err
-	}
-	return prjs, nil
-}
-
-func printProjects(prjs []Project) {
-	var names []string
-	for _, prj := range prjs {
-		names = append(names, prj.Name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		fmt.Println(name)
+		fmt.Println(err)
 	}
 }
 
-func currentTimer() (*Timer, error) {
-	url := fmt.Sprintf("%s/current", baseURL)
-	resp, err := APICall("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var reply struct {
-		Data *Timer `json:"data"`
-	}
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&reply); err != nil {
-		return nil, err
-	}
-
-	return reply.Data, nil
-}
-
-func findProject(name string, prjs []Project) []int {
+func findProject(name string, prjs []togglv8.Project) []int {
 	var matches []int
 	name = strings.ToLower(name)
 	for _, prj := range prjs {
@@ -143,138 +287,7 @@ func findProject(name string, prjs []Project) []int {
 	return matches
 }
 
-func checkArgs() error {
-	if flag.NArg() == 0 {
-		return fmt.Errorf("missing argument")
-	}
-
-	switch flag.Arg(0) {
-	case "start":
-		if flag.NArg() != 2 {
-			return fmt.Errorf("wrong number of arguments")
-		}
-	case "stop", "status", "projects":
-		if flag.NArg() != 1 {
-			return fmt.Errorf("wrong number of arguments")
-		}
-	default:
-		return fmt.Errorf("unknown command - %s", flag.Arg(0))
-	}
-	return nil
-}
-
 func duration2str(dur time.Duration) string {
 	h, m, s := int(dur.Hours()), int(dur.Minutes())%60, int(dur.Seconds())%60
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
-}
-
-func startTimer(pid int) error {
-	data := map[string]interface{}{
-		"time_entry": map[string]interface{}{
-			"pid":          pid,
-			"description":  "",
-			"created_with": "toggl",
-		},
-	}
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	if err := enc.Encode(data); err != nil {
-		return err
-	}
-	url := fmt.Sprintf("%s/start", baseURL)
-	if _, err := APICall("POST", url, &buf); err != nil {
-		return err
-	}
-	return nil
-}
-
-func stopTimer(id int) (time.Duration, error) {
-	url := fmt.Sprintf("%s/%d/stop", baseURL, id)
-	resp, err := APICall("PUT", url, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-	var reply struct {
-		Data struct {
-			Duration int `json:"duration"`
-		}
-	}
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&reply); err != nil {
-		return 0, err
-	}
-	dur := time.Duration(time.Duration(reply.Data.Duration) * time.Second)
-	return dur, err
-}
-
-func main() {
-	log.SetFlags(0) // Don't prefix with time
-	var showVersion bool
-	flag.BoolVar(&showVersion, "version", false, "show version and exit")
-	flag.Usage = func() {
-		name := path.Base(os.Args[0])
-		fmt.Printf("usage: %s start <project>|stop|status|projects\n", name)
-		flag.PrintDefaults()
-	}
-	flag.Parse()
-
-	if showVersion {
-		fmt.Printf("%s\n", Version)
-		os.Exit(0)
-	}
-
-	if err := checkArgs(); err != nil {
-		log.Fatalf("error: %s", err)
-	}
-
-	if err := loadConfig(); err != nil {
-		log.Fatalf("error: can't load config - %s", err)
-	}
-	prjs, err := getProjects()
-	if err != nil {
-		log.Fatalf("error: can't get projects - %s", err)
-	}
-
-	curTimer, err := currentTimer()
-	if err != nil {
-		log.Fatalf("error: can't get current timer - %s", err)
-	}
-
-	switch flag.Arg(0) {
-	case "projects":
-		printProjects(prjs)
-	case "start":
-		if curTimer != nil {
-			log.Fatalf("error: there is a timer running")
-		}
-		name := flag.Arg(1)
-		ids := findProject(name, prjs)
-		switch len(ids) {
-		case 0:
-			log.Fatalf("error: no project match %s", name)
-		case 1:
-		default:
-			log.Fatalf("error: too project many matches to %s", name)
-		}
-		if err := startTimer(ids[0]); err != nil {
-			log.Fatalf("error: can't start timer - %s", err)
-		}
-	case "stop":
-		if curTimer == nil {
-			log.Fatalf("error: no timer running")
-		}
-		dur, err := stopTimer(curTimer.ID)
-		if err != nil {
-			log.Fatalf("error: can't stop timer - %s", err)
-		}
-		fmt.Printf("%s\n", duration2str(dur))
-	case "status":
-		if curTimer == nil {
-			fmt.Println("no timer is running")
-			return
-		}
-		dur := time.Since(curTimer.Start)
-		fmt.Printf("duration: %s\n", duration2str(dur))
-	}
 }
