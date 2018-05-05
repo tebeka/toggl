@@ -6,9 +6,17 @@ This is a simple command line to start/stop timers on
 ## Usage
 
     toggl -h
-    usage: toggl start <project>|stop|status|projects
+    usage: toggl start <project>|stop|status|projects|entries|week
       -version
             show version and exit
+
+#### Examples
+
+    toggl start --at="5 minutes ago" --stop="in 20 minutes" MyProject
+    toggl start --at="10:00" --stop="11:00" --description="Working on toggl" MyProject
+    toggl status
+    toggl entries
+    toggl week
 
 You'll need a `~/.togglrc` with your API key and workspace id. See an example
 [here](togglrc-example).
