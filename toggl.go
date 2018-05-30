@@ -143,12 +143,8 @@ func findProject(name string, prjs []Project) []int {
 	return matches
 }
 
-func checkArgs() error {
-	if flag.NArg() == 0 {
-		return fmt.Errorf("missing argument")
-	}
-
-	switch flag.Arg(0) {
+func checkCommand(command string) error {
+	switch command {
 	case "start":
 		if flag.NArg() != 2 {
 			return fmt.Errorf("wrong number of arguments")
@@ -208,6 +204,19 @@ func stopTimer(id int) (time.Duration, error) {
 	return dur, err
 }
 
+func findCmd(prefix string) []string {
+	commands := []string{"start", "stop", "status", "projects"}
+	var matches []string
+
+	for _, cmd := range commands {
+		if strings.HasPrefix(cmd, prefix) {
+			matches = append(matches, cmd)
+		}
+	}
+
+	return matches
+}
+
 func main() {
 	log.SetFlags(0) // Don't prefix with time
 	var showVersion bool
@@ -224,7 +233,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := checkArgs(); err != nil {
+	matches := findCmd(flag.Arg(0))
+	switch len(matches) {
+	case 0:
+		log.Fatalf("error: unknown command - %q", flag.Arg(0))
+	case 1: /* nop */
+	default:
+		log.Fatalf("error: too many matches to %q", flag.Arg(0))
+	}
+
+	command := matches[0]
+	if err := checkCommand(command); err != nil {
 		log.Fatalf("error: %s", err)
 	}
 
@@ -241,7 +260,7 @@ func main() {
 		log.Fatalf("error: can't get current timer - %s", err)
 	}
 
-	switch flag.Arg(0) {
+	switch command {
 	case "projects":
 		printProjects(prjs)
 	case "start":

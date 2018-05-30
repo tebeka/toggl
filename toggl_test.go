@@ -21,3 +21,25 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatal("bad workspace")
 	}
 }
+
+func TestFindCmd(t *testing.T) {
+	testCases := []struct {
+		cmd string
+		n   int
+	}{
+		{"st", 3}, // start, stop, status
+		{"x", 0},
+		{"sta", 2},  // start, status
+		{"stat", 1}, // status
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.cmd, func(t *testing.T) {
+			matches := findCmd(tc.cmd)
+			if len(matches) != tc.n {
+				t.Fatalf("bad matches for %v - %v, (expected %d)", tc.cmd, matches, tc.n)
+			}
+		})
+	}
+
+}
