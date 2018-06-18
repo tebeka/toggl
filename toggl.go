@@ -233,6 +233,10 @@ func main() {
 		os.Exit(0)
 	}
 
+	if flag.NArg() == 0 {
+		log.Fatalf("error: wrong number of arguments")
+	}
+
 	matches := findCmd(flag.Arg(0))
 	switch len(matches) {
 	case 0:
