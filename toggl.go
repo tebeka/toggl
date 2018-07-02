@@ -20,7 +20,7 @@ const (
 	// APIBase is the base rest API URL
 	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
-	Version  = "0.1.3"
+	Version  = "0.1.4"
 	rcEnvKey = "TOGGLRC"
 )
 
@@ -40,8 +40,9 @@ type Project struct {
 
 // Timer is a toggle running timer
 type Timer struct {
-	ID    int       `json:"id"`
-	Start time.Time `json:"start"`
+	ID      int       `json:"id"`
+	Project int       `json:"pid"`
+	Start   time.Time `json:"start"`
 }
 
 func configFile() (string, error) {
@@ -132,15 +133,25 @@ func currentTimer() (*Timer, error) {
 	return reply.Data, nil
 }
 
-func findProject(name string, prjs []Project) []int {
-	var matches []int
+func findProject(name string, prjs []Project) []Project {
+	var matches []Project
 	name = strings.ToLower(name)
 	for _, prj := range prjs {
 		if strings.HasPrefix(strings.ToLower(prj.Name), name) {
-			matches = append(matches, prj.ID)
+			matches = append(matches, prj)
 		}
 	}
 	return matches
+}
+
+func nameFromID(id int, prjs []Project) string {
+	for _, prj := range prjs {
+		if prj.ID == id {
+			return prj.Name
+		}
+	}
+
+	return "<Unknown>"
 }
 
 func checkCommand(command string) error {
@@ -184,24 +195,25 @@ func startTimer(pid int) error {
 	return nil
 }
 
-func stopTimer(id int) (time.Duration, error) {
+func stopTimer(id int) (int, time.Duration, error) {
 	url := fmt.Sprintf("%s/%d/stop", baseURL, id)
 	resp, err := APICall("PUT", url, nil)
 	if err != nil {
-		return 0, err
+		return -1, 0, err
 	}
 	defer resp.Body.Close()
 	var reply struct {
 		Data struct {
 			Duration int `json:"duration"`
+			ID       int `json:"pid"`
 		}
 	}
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&reply); err != nil {
-		return 0, err
+		return -1, 0, err
 	}
 	dur := time.Duration(time.Duration(reply.Data.Duration) * time.Second)
-	return dur, err
+	return reply.Data.ID, dur, err
 }
 
 func findCmd(prefix string) []string {
@@ -272,32 +284,35 @@ func main() {
 			log.Fatalf("error: there is a timer running")
 		}
 		name := flag.Arg(1)
-		ids := findProject(name, prjs)
-		switch len(ids) {
+		matches := findProject(name, prjs)
+		switch len(matches) {
 		case 0:
 			log.Fatalf("error: no project match %s", name)
 		case 1:
 		default:
 			log.Fatalf("error: too project many matches to %s", name)
 		}
-		if err := startTimer(ids[0]); err != nil {
+		fmt.Printf("Starting %s\n", matches[0].Name)
+		if err := startTimer(matches[0].ID); err != nil {
 			log.Fatalf("error: can't start timer - %s", err)
 		}
 	case "stop":
 		if curTimer == nil {
 			log.Fatalf("error: no timer running")
 		}
-		dur, err := stopTimer(curTimer.ID)
+		pid, dur, err := stopTimer(curTimer.ID)
 		if err != nil {
 			log.Fatalf("error: can't stop timer - %s", err)
 		}
-		fmt.Printf("%s\n", duration2str(dur))
+		name := nameFromID(pid, prjs)
+		fmt.Printf("%s: %s\n", name, duration2str(dur))
 	case "status":
 		if curTimer == nil {
 			fmt.Println("no timer is running")
 			return
 		}
+		name := nameFromID(curTimer.Project, prjs)
 		dur := time.Since(curTimer.Start)
-		fmt.Printf("duration: %s\n", duration2str(dur))
+		fmt.Printf("%s: %s\n", name, duration2str(dur))
 	}
 }
