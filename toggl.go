@@ -21,7 +21,7 @@ const (
 	// APIBase is the base rest API URL
 	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
-	Version  = "0.1.4"
+	Version  = "0.1.5"
 	rcEnvKey = "TOGGLRC"
 )
 
