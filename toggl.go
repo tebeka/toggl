@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/user"
 	"path"
@@ -164,6 +165,10 @@ func checkCommand(command string) error {
 		if flag.NArg() != 1 {
 			return fmt.Errorf("wrong number of arguments")
 		}
+	case "report":
+		if flag.NArg() > 2 {
+			return fmt.Errorf("wrong number of arguments")
+		}
 	default:
 		return fmt.Errorf("unknown command - %s", flag.Arg(0))
 	}
@@ -217,7 +222,7 @@ func stopTimer(id int) (int, time.Duration, error) {
 }
 
 func findCmd(prefix string) []string {
-	commands := []string{"start", "stop", "status", "projects"}
+	commands := []string{"start", "stop", "status", "projects", "report"}
 	var matches []string
 
 	for _, cmd := range commands {
@@ -229,13 +234,52 @@ func findCmd(prefix string) []string {
 	return matches
 }
 
+func report(since string) error {
+	u, err := url.Parse("https://toggl.com/reports/api/v2/summary")
+	if err != nil {
+		return err
+	}
+
+	q := u.Query()
+	q.Set("since", since)
+	q.Set("workspace_id", config.Workspace)
+	q.Set("user_agent", "toggl")
+	u.RawQuery = q.Encode()
+
+	resp, err := APICall("GET", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	var reply struct {
+		Data []struct {
+			Title struct {
+				Project string `json:"project"`
+			} `json:"title"`
+			Time int `json:"time"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&reply); err != nil {
+		return err
+	}
+
+	for _, project := range reply.Data {
+		d := time.Millisecond * time.Duration(project.Time)
+		fmt.Printf("%s: %s\n", project.Title.Project, d)
+	}
+
+	return nil
+}
+
 func main() {
 	log.SetFlags(0) // Don't prefix with time
 	var showVersion bool
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Usage = func() {
 		name := path.Base(os.Args[0])
-		fmt.Printf("usage: %s start <project>|stop|status|projects\n", name)
+		fmt.Printf("usage: %s start <project>|stop|status|projects|report <since>\n", name)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -314,5 +358,15 @@ func main() {
 		name := nameFromID(curTimer.Project, prjs)
 		dur := time.Since(curTimer.Start)
 		fmt.Printf("%s: %s\n", name, duration2str(dur))
+	case "report":
+		yday := time.Now().Add(-24 * time.Hour)
+		since := yday.Format("2006-01-02")
+		if flag.NArg() == 2 {
+			since = flag.Arg(1)
+		}
+
+		if err := report(since); err != nil {
+			log.Fatalf("error: can't get report - %s", err)
+		}
 	}
 }
