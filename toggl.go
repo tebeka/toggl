@@ -31,6 +31,7 @@ var (
 		APIToken  string `json:"api_token"`
 		Workspace string `json:"workspace"`
 	}
+	unknownProject = "<unknown>"
 )
 
 // Project is toggl project
@@ -152,7 +153,7 @@ func nameFromID(id int, prjs []Project) string {
 		}
 	}
 
-	return "<Unknown>"
+	return ""
 }
 
 func checkCommand(command string) error {
@@ -325,7 +326,11 @@ func main() {
 		printProjects(prjs)
 	case "start":
 		if curTimer != nil {
-			log.Fatalf("error: there is a timer running")
+			name := nameFromID(curTimer.Project, prjs)
+			if name == "" {
+				name = unknownProject
+			}
+			log.Fatalf("error: there is a timer running for %q", name)
 		}
 		name := flag.Arg(1)
 		matches := findProject(name, prjs)
@@ -349,6 +354,9 @@ func main() {
 			log.Fatalf("error: can't stop timer - %s", err)
 		}
 		name := nameFromID(pid, prjs)
+		if name == "" {
+			name = unknownProject
+		}
 		fmt.Printf("%s: %s\n", name, duration2str(dur))
 	case "status":
 		if curTimer == nil {
@@ -356,6 +364,9 @@ func main() {
 			return
 		}
 		name := nameFromID(curTimer.Project, prjs)
+		if name == "" {
+			name = unknownProject
+		}
 		dur := time.Since(curTimer.Start)
 		fmt.Printf("%s: %s\n", name, duration2str(dur))
 	case "report":
