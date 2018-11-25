@@ -73,11 +73,7 @@ func loadConfig() error {
 	defer file.Close()
 
 	dec := json.NewDecoder(file)
-	if err := dec.Decode(&config); err != nil {
-		return err
-	}
-
-	return nil
+	return dec.Decode(&config)
 }
 
 // APICall makes an API call with right credentials
