@@ -21,7 +21,7 @@ const (
 	// APIBase is the base rest API URL
 	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
-	Version  = "0.1.6"
+	Version  = "0.1.7"
 	rcEnvKey = "TOGGLRC"
 )
 
@@ -92,6 +92,11 @@ func getProjects() ([]Project, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%q calling %s", resp.Status, url)
+	}
+
 	defer resp.Body.Close()
 	dec := json.NewDecoder(resp.Body)
 	var prjs []Project
