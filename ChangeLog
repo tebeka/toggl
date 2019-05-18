@@ -1,3 +1,6 @@
+2019-05-18 version 0.1.7
+* Check for HTTP errors
+
 2018-07-17 version 0.1.6
 * Project name when timer already running
 
