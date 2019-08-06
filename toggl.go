@@ -77,32 +77,37 @@ func loadConfig() error {
 }
 
 // APICall makes an API call with right credentials
-func APICall(method, url string, body io.Reader) (*http.Response, error) {
+func APICall(method, url string, body io.Reader, out interface{}) error {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	req.SetBasicAuth(config.APIToken, "api_token")
-	return http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%q calling %s", resp.Status, url)
+	}
+
+	if out == nil {
+		return nil
+	}
+
+	dec := json.NewDecoder(resp.Body)
+	return dec.Decode(out)
 }
 
 func getProjects() ([]Project, error) {
 	url := fmt.Sprintf("%s/workspaces/%s/projects", APIBase, config.Workspace)
-	resp, err := APICall("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%q calling %s", resp.Status, url)
-	}
-
-	defer resp.Body.Close()
-	dec := json.NewDecoder(resp.Body)
 	var prjs []Project
-	if err := dec.Decode(&prjs); err != nil {
+	if err := APICall("GET", url, nil, &prjs); err != nil {
 		return nil, err
 	}
+
 	return prjs, nil
 }
 
@@ -119,17 +124,11 @@ func printProjects(prjs []Project) {
 
 func currentTimer() (*Timer, error) {
 	url := fmt.Sprintf("%s/current", baseURL)
-	resp, err := APICall("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	var reply struct {
 		Data *Timer `json:"data"`
 	}
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&reply); err != nil {
+
+	if err := APICall("GET", url, nil, &reply); err != nil {
 		return nil, err
 	}
 
@@ -196,31 +195,23 @@ func startTimer(pid int) error {
 		return err
 	}
 	url := fmt.Sprintf("%s/start", baseURL)
-	if _, err := APICall("POST", url, &buf); err != nil {
-		return err
-	}
-	return nil
+	return APICall("POST", url, &buf, nil)
 }
 
 func stopTimer(id int) (int, time.Duration, error) {
 	url := fmt.Sprintf("%s/%d/stop", baseURL, id)
-	resp, err := APICall("PUT", url, nil)
-	if err != nil {
-		return -1, 0, err
-	}
-	defer resp.Body.Close()
 	var reply struct {
 		Data struct {
 			Duration int `json:"duration"`
 			ID       int `json:"pid"`
 		}
 	}
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&reply); err != nil {
+	if err := APICall("PUT", url, nil, &reply); err != nil {
 		return -1, 0, err
 	}
+
 	dur := time.Duration(time.Duration(reply.Data.Duration) * time.Second)
-	return reply.Data.ID, dur, err
+	return reply.Data.ID, dur, nil
 }
 
 func findCmd(prefix string) []string {
@@ -248,12 +239,6 @@ func report(since string) error {
 	q.Set("user_agent", "toggl")
 	u.RawQuery = q.Encode()
 
-	resp, err := APICall("GET", u.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	defer resp.Body.Close()
 	var reply struct {
 		Data []struct {
 			Title struct {
@@ -263,7 +248,7 @@ func report(since string) error {
 		} `json:"data"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&reply); err != nil {
+	if err := APICall("GET", u.String(), nil, &reply); err != nil {
 		return err
 	}
 
