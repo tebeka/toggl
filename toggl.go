@@ -36,8 +36,9 @@ var (
 
 // Project is toggl project
 type Project struct {
-	Name string `json:"name"`
-	ID   int    `json:"id"`
+	Name     string `json:"name"`
+	ClientID int    `json:"cid"`
+	ID       int    `json:"id"`
 }
 
 // Timer is a toggle running timer
@@ -109,6 +110,19 @@ func getProjects() ([]Project, error) {
 	}
 
 	return prjs, nil
+}
+
+func clientName(cid int) (string, error) {
+	url := fmt.Sprintf("%s/clients/%d", APIBase, cid)
+	var reply struct {
+		Name string `json:"name"`
+	}
+
+	if err := APICall("GET", url, nil, &reply); err != nil {
+		return "", err
+	}
+
+	return reply.Name, nil
 }
 
 func printProjects(prjs []Project) {
