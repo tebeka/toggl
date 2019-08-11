@@ -116,7 +116,12 @@ func printProjects(prjs []Project) {
 	for _, prj := range prjs {
 		names = append(names, prj.Name)
 	}
-	sort.Strings(names)
+
+	cmp := func(i, j int) bool {
+		return strings.ToLower(names[i]) < strings.ToLower(names[j])
+	}
+
+	sort.Slice(names, cmp)
 	for _, name := range names {
 		fmt.Println(name)
 	}
