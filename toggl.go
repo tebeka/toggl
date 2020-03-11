@@ -21,7 +21,7 @@ const (
 	// APIBase is the base rest API URL
 	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
-	Version  = "0.1.7"
+	Version  = "0.1.8"
 	rcEnvKey = "TOGGLRC"
 )
 
@@ -80,9 +80,11 @@ func loadConfig() error {
 func APICall(method, url string, body io.Reader, out interface{}) error {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return nil
+		return err
 	}
+
 	req.SetBasicAuth(config.APIToken, "api_token")
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
