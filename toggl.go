@@ -21,8 +21,13 @@ const (
 	// APIBase is the base rest API URL
 	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
-	Version  = "0.1.8"
+	Version  = "0.1.9"
 	rcEnvKey = "TOGGLRC"
+
+	usage = `usage: %s start <project>|stop|status|projects|report <since>
+	<project> - project name
+	<since> - YYYY-MM-DD (default to start of today)
+`
 )
 
 var (
@@ -273,7 +278,7 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Usage = func() {
 		name := path.Base(os.Args[0])
-		fmt.Printf("usage: %s start <project>|stop|status|projects|report <since>\n", name)
+		fmt.Printf(usage, name)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
