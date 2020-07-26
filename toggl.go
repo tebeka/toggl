@@ -18,21 +18,36 @@ import (
 )
 
 const (
-	// APIBase is the base rest API URL
-	APIBase = "https://www.toggl.com/api/v8"
 	// Version is current version
-	Version  = "0.1.8"
+	Version  = "0.1.9"
 	rcEnvKey = "TOGGLRC"
+	usage    = `usage: %s start <project>|stop|status|projects|report <since>
+	report date format is YYYY-MM-DD
+`
+	unknownProject = "<unknown>"
 )
 
 var (
-	baseURL = fmt.Sprintf("%s/time_entries", APIBase)
-	config  struct {
+	// These are set in init
+	APIBase    string
+	ReportsURL string
+	baseURL    string
+
+	config struct {
 		APIToken  string `json:"api_token"`
 		Workspace string `json:"workspace"`
 	}
-	unknownProject = "<unknown>"
 )
+
+func init() {
+	apiHost := os.Getenv("TOGGL_API_HOST")
+	if apiHost == "" {
+		apiHost = "https://toggl.com"
+	}
+	APIBase = fmt.Sprintf("%s/api/v8", apiHost)
+	ReportsURL = fmt.Sprintf("%s/reports/api/v2/summary", apiHost)
+	baseURL = fmt.Sprintf("%s/time_entries", APIBase)
+}
 
 // Project is toggl project
 type Project struct {
@@ -235,7 +250,7 @@ func findCmd(prefix string) []string {
 }
 
 func report(since string) error {
-	u, err := url.Parse("https://toggl.com/reports/api/v2/summary")
+	u, err := url.Parse(ReportsURL)
 	if err != nil {
 		return err
 	}
@@ -273,7 +288,8 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Usage = func() {
 		name := path.Base(os.Args[0])
-		fmt.Printf("usage: %s start <project>|stop|status|projects|report <since>\n", name)
+		fmt.Fprintf(os.Stderr, usage, name)
+
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -363,8 +379,7 @@ func main() {
 		dur := time.Since(curTimer.Start)
 		fmt.Printf("%s: %s\n", name, duration2str(dur))
 	case "report":
-		yday := time.Now().Add(-24 * time.Hour)
-		since := yday.Format("2006-01-02")
+		since := time.Now().Add(-24 * time.Hour).Format("2006-01-02")
 		if flag.NArg() == 2 {
 			since = flag.Arg(1)
 		}
