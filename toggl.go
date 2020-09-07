@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -83,7 +84,9 @@ func loadConfig() error {
 
 // APICall makes an API call with right credentials
 func APICall(method, url string, body io.Reader, out interface{}) error {
-	req, err := http.NewRequest(method, url, body)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return err
 	}
