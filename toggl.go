@@ -349,6 +349,7 @@ func main() {
 	case "stop":
 		if curTimer == nil {
 			log.Fatalf("error: no timer running")
+			return // make linter happy
 		}
 		pid, dur, err := stopTimer(curTimer.ID)
 		if err != nil {
