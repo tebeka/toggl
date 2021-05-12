@@ -20,9 +20,9 @@ import (
 
 const (
 	// APIBase is the base rest API URL
-	APIBase = "https://www.toggl.com/api/v8"
+	APIBase = "https://api.track.toggl.com/api/v8"
 	// Version is current version
-	Version  = "0.1.9"
+	Version  = "0.2.0"
 	rcEnvKey = "TOGGLRC"
 
 	usage = `usage: %s start <project>|stop|status|projects|report <since>

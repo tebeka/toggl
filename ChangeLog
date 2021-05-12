@@ -1,3 +1,6 @@
+2021-05-12 version 0.2.0
+* Change API url to https://api.track.toggl.com
+
 2019-05-18 version 0.1.7
 * Check for HTTP errors
 
