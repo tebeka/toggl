@@ -22,7 +22,7 @@ const (
 	// APIBase is the base rest API URL
 	APIBase = "https://api.track.toggl.com/api/v8"
 	// Version is current version
-	Version  = "0.2.0"
+	Version  = "0.3.0"
 	rcEnvKey = "TOGGLRC"
 
 	usage = `usage: %s start <project>|stop|status|projects|report <since>
@@ -42,8 +42,9 @@ var (
 
 // Project is toggl project
 type Project struct {
-	Name string `json:"name"`
-	ID   int    `json:"id"`
+	Name     string `json:"name"`
+	ID       int    `json:"id"`
+	ClientID int    `json:"cid"`
 }
 
 // Timer is a toggle running timer
@@ -121,10 +122,37 @@ func getProjects() ([]Project, error) {
 	return prjs, nil
 }
 
+func getClients() (map[int]string, error) {
+	url := fmt.Sprintf("%s/workspaces/%s/clients", APIBase, config.Workspace)
+	var cs []struct {
+		Name string `json:"name"`
+		ID   int    `json:"id"`
+	}
+
+	if err := APICall("GET", url, nil, &cs); err != nil {
+		return nil, err
+	}
+
+	ids := make(map[int]string) // id -> name
+	for _, c := range cs {
+		ids[c.ID] = c.Name
+	}
+	return ids, nil
+}
+
 func printProjects(prjs []Project) {
-	var names []string
+	names := make([]string, 0, len(prjs))
+	clients, err := getClients()
+	if err != nil {
+		log.Printf("warning: can't get clients - %s", err)
+	}
 	for _, prj := range prjs {
-		names = append(names, prj.Name)
+		name := prj.Name
+		client := clients[prj.ClientID]
+		if client != "" {
+			name = fmt.Sprintf("%s/%s", client, name)
+		}
+		names = append(names, name)
 	}
 
 	cmp := func(i, j int) bool {
