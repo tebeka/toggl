@@ -13,11 +13,12 @@ func TestLoadConfig(t *testing.T) {
 
 	os.Setenv(rcEnvKey, "togglrc-example")
 
-	if err := loadConfig(); err != nil {
+	var c config
+	if err := loadConfig(&c); err != nil {
 		t.Fatal(err)
 	}
 
-	if config.Workspace != "123456" {
+	if c.Workspace != "123456" {
 		t.Fatal("bad workspace")
 	}
 }

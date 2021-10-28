@@ -1,26 +1,21 @@
 package main
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
 	"os/user"
 	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/tebeka/toggl/client"
 )
 
 const (
-	// APIBase is the base rest API URL
-	APIBase = "https://api.track.toggl.com/api/v8"
 	// Version is current version
 	Version  = "0.3.0"
 	rcEnvKey = "TOGGLRC"
@@ -32,26 +27,12 @@ const (
 )
 
 var (
-	baseURL = fmt.Sprintf("%s/time_entries", APIBase)
-	config  struct {
-		APIToken  string `json:"api_token"`
-		Workspace string `json:"workspace"`
-	}
 	unknownProject = "<unknown>"
 )
 
-// Project is toggl project
-type Project struct {
-	Name     string `json:"name"`
-	ID       int    `json:"id"`
-	ClientID int    `json:"cid"`
-}
-
-// Timer is a toggle running timer
-type Timer struct {
-	ID      int       `json:"id"`
-	Project int       `json:"pid"`
-	Start   time.Time `json:"start"`
+type config struct {
+	APIToken  string `json:"api_token"`
+	Workspace string `json:"workspace"`
 }
 
 func configFile() (string, error) {
@@ -67,7 +48,7 @@ func configFile() (string, error) {
 	return fmt.Sprintf("%s/.togglrc", user.HomeDir), nil
 }
 
-func loadConfig() error {
+func loadConfig(cfg *config) error {
 	fname, err := configFile()
 	if err != nil {
 		return err
@@ -79,70 +60,12 @@ func loadConfig() error {
 	}
 	defer file.Close()
 
-	dec := json.NewDecoder(file)
-	return dec.Decode(&config)
+	return json.NewDecoder(file).Decode(cfg)
 }
 
-// APICall makes an API call with right credentials
-func APICall(method, url string, body io.Reader, out interface{}) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
-	if err != nil {
-		return err
-	}
-
-	req.SetBasicAuth(config.APIToken, "api_token")
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%q calling %s", resp.Status, url)
-	}
-
-	if out == nil {
-		return nil
-	}
-
-	dec := json.NewDecoder(resp.Body)
-	return dec.Decode(out)
-}
-
-func getProjects() ([]Project, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/projects", APIBase, config.Workspace)
-	var prjs []Project
-	if err := APICall("GET", url, nil, &prjs); err != nil {
-		return nil, err
-	}
-
-	return prjs, nil
-}
-
-func getClients() (map[int]string, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/clients", APIBase, config.Workspace)
-	var cs []struct {
-		Name string `json:"name"`
-		ID   int    `json:"id"`
-	}
-
-	if err := APICall("GET", url, nil, &cs); err != nil {
-		return nil, err
-	}
-
-	ids := make(map[int]string) // id -> name
-	for _, c := range cs {
-		ids[c.ID] = c.Name
-	}
-	return ids, nil
-}
-
-func printProjects(prjs []Project) {
+func printProjects(c *client.Client, prjs []client.Project) {
 	names := make([]string, 0, len(prjs))
-	clients, err := getClients()
+	clients, err := c.Clients()
 	if err != nil {
 		log.Printf("warning: can't get clients - %s", err)
 	}
@@ -165,21 +88,8 @@ func printProjects(prjs []Project) {
 	}
 }
 
-func currentTimer() (*Timer, error) {
-	url := fmt.Sprintf("%s/current", baseURL)
-	var reply struct {
-		Data *Timer `json:"data"`
-	}
-
-	if err := APICall("GET", url, nil, &reply); err != nil {
-		return nil, err
-	}
-
-	return reply.Data, nil
-}
-
-func findProject(name string, prjs []Project) []Project {
-	var matches []Project
+func findProject(name string, prjs []client.Project) []client.Project {
+	var matches []client.Project
 	name = strings.ToLower(name)
 	for _, prj := range prjs {
 		if strings.HasPrefix(strings.ToLower(prj.Name), name) {
@@ -189,7 +99,7 @@ func findProject(name string, prjs []Project) []Project {
 	return matches
 }
 
-func nameFromID(id int, prjs []Project) string {
+func nameFromID(id int, prjs []client.Project) string {
 	for _, prj := range prjs {
 		if prj.ID == id {
 			return prj.Name
@@ -224,39 +134,6 @@ func duration2str(dur time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
-func startTimer(pid int) error {
-	data := map[string]interface{}{
-		"time_entry": map[string]interface{}{
-			"pid":          pid,
-			"description":  "",
-			"created_with": "toggl",
-		},
-	}
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	if err := enc.Encode(data); err != nil {
-		return err
-	}
-	url := fmt.Sprintf("%s/start", baseURL)
-	return APICall("POST", url, &buf, nil)
-}
-
-func stopTimer(id int) (int, time.Duration, error) {
-	url := fmt.Sprintf("%s/%d/stop", baseURL, id)
-	var reply struct {
-		Data struct {
-			Duration int `json:"duration"`
-			ID       int `json:"pid"`
-		}
-	}
-	if err := APICall("PUT", url, nil, &reply); err != nil {
-		return -1, 0, err
-	}
-
-	dur := time.Duration(time.Duration(reply.Data.Duration) * time.Second)
-	return reply.Data.ID, dur, nil
-}
-
 func findCmd(prefix string) []string {
 	commands := []string{"start", "stop", "status", "projects", "report"}
 	var matches []string
@@ -268,39 +145,6 @@ func findCmd(prefix string) []string {
 	}
 
 	return matches
-}
-
-func report(since string) error {
-	u, err := url.Parse("https://toggl.com/reports/api/v2/summary")
-	if err != nil {
-		return err
-	}
-
-	q := u.Query()
-	q.Set("since", since)
-	q.Set("workspace_id", config.Workspace)
-	q.Set("user_agent", "toggl")
-	u.RawQuery = q.Encode()
-
-	var reply struct {
-		Data []struct {
-			Title struct {
-				Project string `json:"project"`
-			} `json:"title"`
-			Time int `json:"time"`
-		} `json:"data"`
-	}
-
-	if err := APICall("GET", u.String(), nil, &reply); err != nil {
-		return err
-	}
-
-	for _, project := range reply.Data {
-		d := time.Millisecond * time.Duration(project.Time)
-		fmt.Printf("%s: %s\n", project.Title.Project, d)
-	}
-
-	return nil
 }
 
 func main() {
@@ -337,22 +181,29 @@ func main() {
 		log.Fatalf("error: %s", err)
 	}
 
-	if err := loadConfig(); err != nil {
+	var cfg config
+	if err := loadConfig(&cfg); err != nil {
 		log.Fatalf("error: can't load config - %s", err)
 	}
-	prjs, err := getProjects()
+
+	c, err := client.New(cfg.APIToken, cfg.Workspace)
+	if err != nil {
+		log.Fatalf("error: can't create client: %s", err)
+	}
+
+	prjs, err := c.Projects()
 	if err != nil {
 		log.Fatalf("error: can't get projects - %s", err)
 	}
 
-	curTimer, err := currentTimer()
+	curTimer, err := c.Timer()
 	if err != nil {
 		log.Fatalf("error: can't get current timer - %s", err)
 	}
 
 	switch command {
 	case "projects":
-		printProjects(prjs)
+		printProjects(c, prjs)
 	case "start":
 		if curTimer != nil {
 			name := nameFromID(curTimer.Project, prjs)
@@ -371,7 +222,7 @@ func main() {
 			log.Fatalf("error: too project many matches to %s", name)
 		}
 		fmt.Printf("Starting %s\n", matches[0].Name)
-		if err := startTimer(matches[0].ID); err != nil {
+		if err := c.Start(matches[0].ID); err != nil {
 			log.Fatalf("error: can't start timer - %s", err)
 		}
 	case "stop":
@@ -379,7 +230,7 @@ func main() {
 			log.Fatalf("error: no timer running")
 			return // make linter happy
 		}
-		pid, dur, err := stopTimer(curTimer.ID)
+		pid, dur, err := c.Stop(curTimer.ID)
 		if err != nil {
 			log.Fatalf("error: can't stop timer - %s", err)
 		}
@@ -406,8 +257,13 @@ func main() {
 			since = flag.Arg(1)
 		}
 
-		if err := report(since); err != nil {
-			log.Fatalf("error: can't get report - %s", err)
+		reps, err := c.Report(since)
+		if err != nil {
+			log.Fatalf("error: can't get report: %s", err)
+		}
+
+		for _, r := range reps {
+			fmt.Printf("%s: %s\n", r.Project, r.Duration)
 		}
 	}
 }
