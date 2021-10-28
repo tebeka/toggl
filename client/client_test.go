@@ -25,7 +25,9 @@ func (mt mockTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 
 	rec := httptest.NewRecorder()
-	rec.Write(mt.data)
+	if _, err := rec.Write(mt.data); err != nil {
+		return nil, err
+	}
 	rec.Header().Set("Content-Type", "application/json")
 	return rec.Result(), nil
 }
