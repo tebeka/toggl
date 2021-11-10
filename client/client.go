@@ -163,7 +163,7 @@ type Report struct {
 }
 
 func (c *Client) Report(since string) ([]Report, error) {
-	u, err := url.Parse("https://toggl.com/reports/api/v2/summary")
+	u, err := url.Parse("https://api.track.toggl.com/reports/api/v2/summary")
 	if err != nil {
 		return nil, err
 	}
