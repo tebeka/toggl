@@ -17,7 +17,7 @@ import (
 
 const (
 	// Version is current version
-	Version  = "0.3.0"
+	Version  = "0.3.1"
 	rcEnvKey = "TOGGLRC"
 
 	usage = `usage: %s start <project>|stop|status|projects|report <since>
