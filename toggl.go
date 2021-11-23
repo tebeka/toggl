@@ -54,11 +54,15 @@ func loadConfig(cfg *config) error {
 		return err
 	}
 
-	file, err := os.Open(fname)
+	file, err := os.Open(fname) // #nosec
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("warning: can't close %s - %s", fname, err)
+		}
+	}()
 
 	return json.NewDecoder(file).Decode(cfg)
 }
