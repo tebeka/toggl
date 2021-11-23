@@ -14,10 +14,6 @@ jobs:
         go-version: ${{ matrix.go-version }}
     - name: Checkout code
       uses: actions/checkout@v2
-    - name: Run Gosec Security Scanner
-      uses: securego/gosec@master
-      with:
-        args: ./...
     - name: Test
       run: go test ./...
   golangci:
@@ -29,3 +25,13 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.42
+  gosec:
+    name: gosec
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: ./...
