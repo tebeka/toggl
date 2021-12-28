@@ -1,3 +1,6 @@
+2021-12-28 version 0.4.0
+* Added "timeout" to configuration
+
 2021-11-10 version 0.3.1
 * Reports new API base URL
 
