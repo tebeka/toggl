@@ -34,7 +34,11 @@ func (mt mockTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 func TestProjects(t *testing.T) {
 	require := require.New(t)
-	c, err := New("api-key", "workspace")
+	cfg := Config{
+		APIToken:  "api-key",
+		Workspace: "workspace",
+	}
+	c, err := New(cfg)
 	require.NoError(err)
 
 	mt := mockTripper{projectsJSON, nil}

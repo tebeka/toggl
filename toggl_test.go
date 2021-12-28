@@ -13,8 +13,8 @@ func TestLoadConfig(t *testing.T) {
 
 	os.Setenv(rcEnvKey, "togglrc-example")
 
-	var c config
-	if err := loadConfig(&c); err != nil {
+	c, err := loadConfig()
+	if err != nil {
 		t.Fatal(err)
 	}
 
