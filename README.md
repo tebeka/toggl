@@ -15,8 +15,7 @@ This is a simple command line to start/stop timers on
 	    show version and exit
 
 
-You'll need a `~/.togglrc` with your API key and workspace id. See an example
-[here](togglrc-example).
+You'll need a `~/.togglrc` with your API key and workspace id. See an example [here](togglrc-example) (`timeout` is optional).
 
 ## Installing
 
@@ -24,8 +23,7 @@ If you have the Go SDK then
 
     go get github.com/tebeka/toggl
 
-Or you can download a binary from the [release
-section](https://github.com/tebeka/toggl/releases).
+Or you can download a binary from the [release section](https://github.com/tebeka/toggl/releases).
 
 ## Licence
 [BSD](LICENCE)

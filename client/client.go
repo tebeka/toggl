@@ -20,17 +20,25 @@ var (
 	baseURL = fmt.Sprintf("%s/time_entries", APIBase)
 )
 
+type Config struct {
+	APIToken  string        `json:"api_token"`
+	Workspace string        `json:"workspace"`
+	Timeout   time.Duration `json:"timeout"`
+}
+
 type Client struct {
 	apiToken  string
 	workspace string
+	timeout   time.Duration
 
 	c *http.Client
 }
 
-func New(apiToken, workspace string) (*Client, error) {
+func New(cfg Config) (*Client, error) {
 	c := &Client{
-		apiToken:  apiToken,
-		workspace: workspace,
+		apiToken:  cfg.APIToken,
+		workspace: cfg.Workspace,
+		timeout:   cfg.Timeout,
 
 		c: &http.Client{},
 	}

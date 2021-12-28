@@ -17,7 +17,7 @@ import (
 
 const (
 	// Version is current version
-	Version  = "0.3.1"
+	Version  = "0.4.0"
 	rcEnvKey = "TOGGLRC"
 
 	usage = `usage: %s start <project>|stop|status|projects|report <since>
@@ -29,11 +29,6 @@ const (
 var (
 	unknownProject = "<unknown>"
 )
-
-type config struct {
-	APIToken  string `json:"api_token"`
-	Workspace string `json:"workspace"`
-}
 
 func configFile() (string, error) {
 	path := os.Getenv(rcEnvKey)
@@ -48,19 +43,44 @@ func configFile() (string, error) {
 	return fmt.Sprintf("%s/.togglrc", user.HomeDir), nil
 }
 
-func loadConfig(cfg *config) error {
+func loadConfig() (client.Config, error) {
 	fname, err := configFile()
 	if err != nil {
-		return err
+		return client.Config{}, err
 	}
 
 	file, err := os.Open(fname) // #nosec
 	if err != nil {
-		return err
+		return client.Config{}, err
 	}
 	defer file.Close() // #nosec
 
-	return json.NewDecoder(file).Decode(cfg)
+	var cfg struct {
+		APIToken  string `json:"api_token"`
+		Workspace string `json:"workspace"`
+		Timeout   string `json:"timeout"`
+	}
+
+	if err := json.NewDecoder(file).Decode(&cfg); err != nil {
+		return client.Config{}, err
+	}
+
+	timeout := 5 * time.Second
+	if cfg.Timeout != "" {
+		var err error
+		timeout, err = time.ParseDuration(cfg.Timeout)
+		if err != nil {
+			return client.Config{}, err
+		}
+	}
+
+	c := client.Config{
+		APIToken:  cfg.APIToken,
+		Workspace: cfg.Workspace,
+		Timeout:   timeout,
+	}
+	return c, nil
+
 }
 
 func printProjects(c *client.Client, prjs []client.Project) {
@@ -181,12 +201,12 @@ func main() {
 		log.Fatalf("error: %s", err)
 	}
 
-	var cfg config
-	if err := loadConfig(&cfg); err != nil {
+	cfg, err := loadConfig()
+	if err != nil {
 		log.Fatalf("error: can't load config - %s", err)
 	}
 
-	c, err := client.New(cfg.APIToken, cfg.Workspace)
+	c, err := client.New(cfg)
 	if err != nil {
 		log.Fatalf("error: can't create client: %s", err)
 	}
