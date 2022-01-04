@@ -47,8 +47,8 @@ func TestProjects(t *testing.T) {
 	prjs, err := c.Projects()
 	require.NoError(err)
 	expected := []Project{
-		{"A", 1, 0},
-		{"B", 2, 0},
+		{"A", 1, 0, ""},
+		{"B", 2, 0, ""},
 	}
 	require.Equal(expected, prjs)
 }

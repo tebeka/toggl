@@ -78,9 +78,17 @@ func (c *Client) call(method, url string, body io.Reader, out interface{}) error
 
 // Project is toggl project
 type Project struct {
-	Name     string `json:"name"`
-	ID       int    `json:"id"`
-	ClientID int    `json:"cid"`
+	Name       string `json:"name"`
+	ID         int    `json:"id"`
+	ClientID   int    `json:"cid"`
+	ClientName string
+}
+
+func (p Project) FullName() string {
+	if p.ClientName != "" {
+		return fmt.Sprintf("%s/%s", p.ClientName, p.Name)
+	}
+	return p.Name
 }
 
 func (c *Client) Projects() ([]Project, error) {
@@ -88,6 +96,18 @@ func (c *Client) Projects() ([]Project, error) {
 	var prjs []Project
 	if err := c.call("GET", url, nil, &prjs); err != nil {
 		return nil, err
+	}
+
+	clients, err := c.Clients()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range prjs {
+		client := clients[prjs[i].ClientID]
+		if client != "" {
+			prjs[i].ClientName = client
+		}
 	}
 
 	return prjs, nil

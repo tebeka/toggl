@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sahilm/fuzzy"
+
 	"github.com/tebeka/toggl/client"
 )
 
@@ -85,17 +87,8 @@ func loadConfig() (client.Config, error) {
 
 func printProjects(c *client.Client, prjs []client.Project) {
 	names := make([]string, 0, len(prjs))
-	clients, err := c.Clients()
-	if err != nil {
-		log.Printf("warning: can't get clients - %s", err)
-	}
 	for _, prj := range prjs {
-		name := prj.Name
-		client := clients[prj.ClientID]
-		if client != "" {
-			name = fmt.Sprintf("%s/%s", client, name)
-		}
-		names = append(names, name)
+		names = append(names, prj.FullName())
 	}
 
 	cmp := func(i, j int) bool {
@@ -108,15 +101,19 @@ func printProjects(c *client.Client, prjs []client.Project) {
 	}
 }
 
+// fuzzy.Source interface
+type projects []client.Project
+
+func (ps projects) String(i int) string { return ps[i].FullName() }
+func (ps projects) Len() int            { return len(ps) }
+
 func findProject(name string, prjs []client.Project) []client.Project {
-	var matches []client.Project
-	name = strings.ToLower(name)
-	for _, prj := range prjs {
-		if strings.HasPrefix(strings.ToLower(prj.Name), name) {
-			matches = append(matches, prj)
-		}
+	matches := fuzzy.FindFrom(name, projects(prjs))
+	out := make([]client.Project, len(matches))
+	for i, m := range matches {
+		out[i] = prjs[m.Index]
 	}
-	return matches
+	return out
 }
 
 func nameFromID(id int, prjs []client.Project) string {
