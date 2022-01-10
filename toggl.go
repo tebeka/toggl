@@ -164,6 +164,13 @@ func findCmd(prefix string) []string {
 	return matches
 }
 
+func projectsStr(prjs []string) string {
+	s := make([]string, len(prjs))
+	copy(s, prjs)
+	sort.Strings(s)
+	return strings.Join(s, ", ")
+}
+
 func main() {
 	log.SetFlags(0) // Don't prefix with time
 	var showVersion bool
@@ -190,7 +197,7 @@ func main() {
 		log.Fatalf("error: unknown command - %q", flag.Arg(0))
 	case 1: /* nop */
 	default:
-		log.Fatalf("error: too many matches to %q", flag.Arg(0))
+		log.Fatalf("error: too many matches to %q: %s", flag.Arg(0), projectsStr(matches))
 	}
 
 	command := matches[0]
@@ -236,7 +243,12 @@ func main() {
 			log.Fatalf("error: no project match %s", name)
 		case 1:
 		default:
-			log.Fatalf("error: too project many matches to %s", name)
+			names := make([]string, len(matches))
+			for i, p := range matches {
+				names[i] = p.Name
+			}
+
+			log.Fatalf("error: too many matches to %q: %s", flag.Arg(0), projectsStr(names))
 		}
 		fmt.Printf("Starting %s\n", matches[0].Name)
 		if err := c.Start(matches[0].ID); err != nil {
