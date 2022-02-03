@@ -1,3 +1,6 @@
+2022-02-03 version 0.4.4
+* Print search term, not command
+
 2022-01-10 version 0.4.3
 * Print matches when there are too many
 
