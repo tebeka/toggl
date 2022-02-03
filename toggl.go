@@ -248,7 +248,7 @@ func main() {
 				names[i] = p.Name
 			}
 
-			log.Fatalf("error: too many matches to %q: %s", flag.Arg(0), projectsStr(names))
+			log.Fatalf("error: too many matches to %q: %s", name, projectsStr(names))
 		}
 		fmt.Printf("Starting %s\n", matches[0].Name)
 		if err := c.Start(matches[0].ID); err != nil {
