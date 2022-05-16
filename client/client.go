@@ -31,7 +31,7 @@ type Client struct {
 	workspace string
 	timeout   time.Duration
 
-	c *http.Client
+	c http.Client
 }
 
 func New(cfg Config) (*Client, error) {
@@ -39,8 +39,6 @@ func New(cfg Config) (*Client, error) {
 		apiToken:  cfg.APIToken,
 		workspace: cfg.Workspace,
 		timeout:   cfg.Timeout,
-
-		c: &http.Client{},
 	}
 
 	return c, nil
