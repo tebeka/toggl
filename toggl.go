@@ -24,7 +24,7 @@ const (
 
 	usage = `usage: %s start <project>|stop|status|projects|report <since>
 	<project> - project name
-	<since> - YYYY-MM-DD (default to start of today)
+	<since>   - YYYY-MM-DD (default to start of today)
 `
 )
 
