@@ -1,3 +1,6 @@
+2022-10-18 version 0.4.5
+* Use timeout from configuration
+
 2022-02-03 version 0.4.4
 * Print search term, not command
 
