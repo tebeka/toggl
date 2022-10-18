@@ -46,7 +46,7 @@ func New(cfg Config) (*Client, error) {
 
 // call makes an API call with right credentials
 func (c *Client) call(method, url string, body io.Reader, out interface{}) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
