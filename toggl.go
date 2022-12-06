@@ -18,8 +18,6 @@ import (
 )
 
 const (
-	// Version is current version
-	Version  = "0.4.5"
 	rcEnvKey = "TOGGLRC"
 
 	usage = `usage: %s start <project>|stop|status|projects|report <since>
@@ -29,6 +27,7 @@ const (
 )
 
 var (
+	version        = "0.4.5"
 	unknownProject = "<unknown>"
 )
 
@@ -183,7 +182,7 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("%s\n", Version)
+		fmt.Printf("%s\n", version)
 		os.Exit(0)
 	}
 
