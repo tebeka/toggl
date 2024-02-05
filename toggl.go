@@ -2,17 +2,16 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/user"
-	"path"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/sahilm/fuzzy"
+	"github.com/urfave/cli/v2"
 
 	"github.com/tebeka/toggl/client"
 )
@@ -84,22 +83,6 @@ func loadConfig() (client.Config, error) {
 
 }
 
-func printProjects(c *client.Client, prjs []client.Project) {
-	names := make([]string, 0, len(prjs))
-	for _, prj := range prjs {
-		names = append(names, prj.FullName())
-	}
-
-	cmp := func(i, j int) bool {
-		return strings.ToLower(names[i]) < strings.ToLower(names[j])
-	}
-
-	sort.Slice(names, cmp)
-	for _, name := range names {
-		fmt.Println(name)
-	}
-}
-
 // fuzzy.Source interface
 type projects []client.Project
 
@@ -125,42 +108,9 @@ func nameFromID(id int, prjs []client.Project) string {
 	return ""
 }
 
-func checkCommand(command string) error {
-	switch command {
-	case "start":
-		if flag.NArg() != 2 {
-			return fmt.Errorf("wrong number of arguments")
-		}
-	case "stop", "status", "projects":
-		if flag.NArg() != 1 {
-			return fmt.Errorf("wrong number of arguments")
-		}
-	case "report":
-		if flag.NArg() > 2 {
-			return fmt.Errorf("wrong number of arguments")
-		}
-	default:
-		return fmt.Errorf("unknown command - %s", flag.Arg(0))
-	}
-	return nil
-}
-
 func duration2str(dur time.Duration) string {
 	h, m, s := int(dur.Hours()), int(dur.Minutes())%60, int(dur.Seconds())%60
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
-}
-
-func findCmd(prefix string) []string {
-	commands := []string{"start", "stop", "status", "projects", "report"}
-	var matches []string
-
-	for _, cmd := range commands {
-		if strings.HasPrefix(cmd, prefix) {
-			matches = append(matches, cmd)
-		}
-	}
-
-	return matches
 }
 
 func projectsStr(prjs []string) string {
@@ -170,128 +120,238 @@ func projectsStr(prjs []string) string {
 	return strings.Join(s, ", ")
 }
 
-func main() {
-	log.SetFlags(0) // Don't prefix with time
-	var showVersion bool
-	flag.BoolVar(&showVersion, "version", false, "show version and exit")
-	flag.Usage = func() {
-		name := path.Base(os.Args[0])
-		fmt.Printf(usage, name)
-		flag.PrintDefaults()
-	}
-	flag.Parse()
-
-	if showVersion {
-		fmt.Printf("%s\n", version)
-		os.Exit(0)
-	}
-
-	if flag.NArg() == 0 {
-		log.Fatalf("error: wrong number of arguments")
-	}
-
-	matches := findCmd(flag.Arg(0))
-	switch len(matches) {
-	case 0:
-		log.Fatalf("error: unknown command - %q", flag.Arg(0))
-	case 1: /* nop */
-	default:
-		log.Fatalf("error: too many matches to %q: %s", flag.Arg(0), projectsStr(matches))
-	}
-
-	command := matches[0]
-	if err := checkCommand(command); err != nil {
-		log.Fatalf("error: %s", err)
-	}
-
+func newClient() (*client.Client, error) {
 	cfg, err := loadConfig()
 	if err != nil {
-		log.Fatalf("error: can't load config - %s", err)
+		return nil, err
 	}
 
-	c, err := client.New(cfg)
+	return client.New(cfg)
+}
+
+func projectsCmd(ctx *cli.Context) error {
+	if ctx.NArg() != 0 {
+		return fmt.Errorf("wrong number of arguments")
+	}
+
+	c, err := newClient()
 	if err != nil {
-		log.Fatalf("error: can't create client: %s", err)
+		return err
 	}
 
 	prjs, err := c.Projects()
+	names := make([]string, 0, len(prjs))
+	for _, prj := range prjs {
+		names = append(names, prj.FullName())
+	}
+
+	cmp := func(i, j int) bool {
+		return strings.ToLower(names[i]) < strings.ToLower(names[j])
+	}
+
+	sort.Slice(names, cmp)
+	for _, name := range names {
+		fmt.Println(name)
+	}
+
+	return nil
+}
+
+func startCmd(ctx *cli.Context) error {
+	if ctx.NArg() != 1 {
+		return fmt.Errorf("wrong number of arguments")
+	}
+
+	c, err := newClient()
 	if err != nil {
-		log.Fatalf("error: can't get projects - %s", err)
+		return err
 	}
 
 	curTimer, err := c.Timer()
 	if err != nil {
-		log.Fatalf("error: can't get current timer - %s", err)
+		return err
 	}
 
-	switch command {
-	case "projects":
-		printProjects(c, prjs)
-	case "start":
-		if curTimer != nil {
+	if curTimer != nil {
+		return fmt.Errorf("there's a timer running")
+	}
+
+	prjs, err := c.Projects()
+	if err != nil {
+		return err
+	}
+
+	name := ctx.Args().Get(0)
+	matches := findProject(name, prjs)
+	switch len(matches) {
+	case 0:
+		log.Fatalf("error: no project match %s", name)
+	case 1:
+	default:
+		names := make([]string, len(matches))
+		for i, p := range matches {
+			names[i] = p.Name
+		}
+
+		return fmt.Errorf("too many matches to %q: %s", name, projectsStr(names))
+	}
+
+	fmt.Printf("Starting %s\n", matches[0].Name)
+	return c.Start(matches[0].ID)
+}
+
+func stopCmd(ctx *cli.Context) error {
+	if ctx.NArg() != 0 {
+		return fmt.Errorf("wrong number of arguments")
+	}
+
+	c, err := newClient()
+	if err != nil {
+		return err
+	}
+
+	curTimer, err := c.Timer()
+	if err != nil {
+		return err
+	}
+
+	if curTimer == nil {
+		return fmt.Errorf("no timer running")
+	}
+
+	pid, dur, err := c.Stop(curTimer.ID)
+	if err != nil {
+		return err
+	}
+
+	prjs, err := c.Projects()
+	if err != nil {
+		return err
+	}
+
+	name := nameFromID(pid, prjs)
+	if name == "" {
+		name = unknownProject
+	}
+	fmt.Printf("%s: %s\n", name, duration2str(dur))
+	return nil
+}
+
+func main() {
+	log.SetFlags(0) // Don't prefix with time
+
+	app := cli.App{
+		Name:  "toggl",
+		Usage: "toggl track client",
+		Commands: []*cli.Command{
+			{
+				Name:  "version",
+				Usage: "show version and exit",
+				Action: func(ctx *cli.Context) error {
+					fmt.Printf("%s\n", version)
+					return nil
+				},
+			},
+			{
+				Name:   "projects",
+				Usage:  "show workspace projects",
+				Action: projectsCmd,
+			},
+			{
+				Name:   "start",
+				Usage:  "start timer",
+				Action: startCmd,
+			},
+			{
+				Name:   "stop",
+				Usage:  "stop timer",
+				Action: stopCmd,
+			},
+		},
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatalf("error: %s", err)
+	}
+
+	return
+
+	/*
+
+		curTimer, err := c.Timer()
+		if err != nil {
+			log.Fatalf("error: can't get current timer - %s", err)
+		}
+
+		switch command {
+		case "projects":
+			printProjects(c, prjs)
+		case "start":
+			if curTimer != nil {
+				name := nameFromID(curTimer.Project, prjs)
+				if name == "" {
+					name = unknownProject
+				}
+				log.Fatalf("error: there is a timer running for %q", name)
+			}
+			name := flag.Arg(1)
+			matches := findProject(name, prjs)
+			switch len(matches) {
+			case 0:
+				log.Fatalf("error: no project match %s", name)
+			case 1:
+			default:
+				names := make([]string, len(matches))
+				for i, p := range matches {
+					names[i] = p.Name
+				}
+
+				log.Fatalf("error: too many matches to %q: %s", name, projectsStr(names))
+			}
+			fmt.Printf("Starting %s\n", matches[0].Name)
+			if err := c.Start(matches[0].ID); err != nil {
+				log.Fatalf("error: can't start timer - %s", err)
+			}
+		case "stop":
+			if curTimer == nil {
+				log.Fatalf("error: no timer running")
+				return // make linter happy
+			}
+			pid, dur, err := c.Stop(curTimer.ID)
+			if err != nil {
+				log.Fatalf("error: can't stop timer - %s", err)
+			}
+			name := nameFromID(pid, prjs)
+			if name == "" {
+				name = unknownProject
+			}
+			fmt.Printf("%s: %s\n", name, duration2str(dur))
+		case "status":
+			if curTimer == nil {
+				fmt.Println("no timer is running")
+				return
+			}
 			name := nameFromID(curTimer.Project, prjs)
 			if name == "" {
 				name = unknownProject
 			}
-			log.Fatalf("error: there is a timer running for %q", name)
-		}
-		name := flag.Arg(1)
-		matches := findProject(name, prjs)
-		switch len(matches) {
-		case 0:
-			log.Fatalf("error: no project match %s", name)
-		case 1:
-		default:
-			names := make([]string, len(matches))
-			for i, p := range matches {
-				names[i] = p.Name
+			dur := time.Since(curTimer.Start)
+			fmt.Printf("%s: %s\n", name, duration2str(dur))
+		case "report":
+			yday := time.Now().Add(-24 * time.Hour)
+			since := yday.Format("2006-01-02")
+			if flag.NArg() == 2 {
+				since = flag.Arg(1)
 			}
 
-			log.Fatalf("error: too many matches to %q: %s", name, projectsStr(names))
-		}
-		fmt.Printf("Starting %s\n", matches[0].Name)
-		if err := c.Start(matches[0].ID); err != nil {
-			log.Fatalf("error: can't start timer - %s", err)
-		}
-	case "stop":
-		if curTimer == nil {
-			log.Fatalf("error: no timer running")
-			return // make linter happy
-		}
-		pid, dur, err := c.Stop(curTimer.ID)
-		if err != nil {
-			log.Fatalf("error: can't stop timer - %s", err)
-		}
-		name := nameFromID(pid, prjs)
-		if name == "" {
-			name = unknownProject
-		}
-		fmt.Printf("%s: %s\n", name, duration2str(dur))
-	case "status":
-		if curTimer == nil {
-			fmt.Println("no timer is running")
-			return
-		}
-		name := nameFromID(curTimer.Project, prjs)
-		if name == "" {
-			name = unknownProject
-		}
-		dur := time.Since(curTimer.Start)
-		fmt.Printf("%s: %s\n", name, duration2str(dur))
-	case "report":
-		yday := time.Now().Add(-24 * time.Hour)
-		since := yday.Format("2006-01-02")
-		if flag.NArg() == 2 {
-			since = flag.Arg(1)
-		}
+			reps, err := c.Report(since)
+			if err != nil {
+				log.Fatalf("error: can't get report: %s", err)
+			}
 
-		reps, err := c.Report(since)
-		if err != nil {
-			log.Fatalf("error: can't get report: %s", err)
+			for _, r := range reps {
+				fmt.Printf("%s: %s\n", r.Project, r.Duration)
+			}
 		}
-
-		for _, r := range reps {
-			fmt.Printf("%s: %s\n", r.Project, r.Duration)
-		}
-	}
+	*/
 }

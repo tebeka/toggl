@@ -13,12 +13,8 @@ import (
 )
 
 const (
-	// APIBase is the base rest API URL
-	APIBase = "https://api.track.toggl.com/api/v8"
-)
-
-var (
-	baseURL = fmt.Sprintf("%s/time_entries", APIBase)
+	// baseURL is the base rest API URL
+	baseURL = "https://api.track.toggl.com/api/v9"
 )
 
 type Config struct {
@@ -96,7 +92,7 @@ func (p Project) FullName() string {
 }
 
 func (c *Client) Projects() ([]Project, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/projects", APIBase, c.workspace)
+	url := fmt.Sprintf("%s/workspaces/%s/projects", baseURL, c.workspace)
 	var prjs []Project
 	if err := c.call("GET", url, nil, &prjs); err != nil {
 		return nil, err
@@ -118,7 +114,7 @@ func (c *Client) Projects() ([]Project, error) {
 }
 
 func (c *Client) Clients() (map[int]string, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/clients", APIBase, c.workspace)
+	url := fmt.Sprintf("%s/workspaces/%s/clients", baseURL, c.workspace)
 
 	var cs []struct {
 		Name string `json:"name"`
@@ -144,7 +140,7 @@ type Timer struct {
 }
 
 func (c *Client) Timer() (*Timer, error) {
-	url := fmt.Sprintf("%s/current", baseURL)
+	url := fmt.Sprintf("%s/me/time_entries/current", baseURL)
 	var reply struct {
 		Data *Timer `json:"data"`
 	}
@@ -156,25 +152,25 @@ func (c *Client) Timer() (*Timer, error) {
 	return reply.Data, nil
 }
 
+func (c *Client) timesURL() string {
+	return fmt.Sprintf("%s/workspaces/%s/time_entries", baseURL, c.workspace)
+}
+
 func (c *Client) Start(pid int) error {
-	data := map[string]interface{}{
-		"time_entry": map[string]interface{}{
-			"pid":          pid,
-			"description":  "",
-			"created_with": "toggl",
-		},
+	data := map[string]any{
+		"duartion": -1,
+		"start":    time.Now().UTC().Format("2006-01-02T15:04:05Z"),
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	if err := enc.Encode(data); err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/start", baseURL)
-	return c.call("POST", url, &buf, nil)
+	return c.call("POST", c.timesURL(), &buf, nil)
 }
 
 func (c *Client) Stop(id int) (int, time.Duration, error) {
-	url := fmt.Sprintf("%s/%d/stop", baseURL, id)
+	url := fmt.Sprintf("%s/%d/stop", c.timesURL(), id)
 	var reply struct {
 		Data struct {
 			Duration int `json:"duration"`
