@@ -56,9 +56,9 @@ func loadConfig() (client.Config, error) {
 	defer file.Close() // #nosec
 
 	var cfg struct {
-		APIToken  string `json:"api_token"`
-		Workspace string `json:"workspace"`
-		Timeout   string `json:"timeout"`
+		APIToken  string
+		Workspace int
+		Timeout   string
 	}
 
 	if err := json.NewDecoder(file).Decode(&cfg); err != nil {
@@ -80,7 +80,6 @@ func loadConfig() (client.Config, error) {
 		Timeout:   timeout,
 	}
 	return c, nil
-
 }
 
 // fuzzy.Source interface

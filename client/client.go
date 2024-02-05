@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -18,24 +19,24 @@ const (
 )
 
 type Config struct {
-	APIToken  string        `json:"api_token"`
-	Workspace string        `json:"workspace"`
-	Timeout   time.Duration `json:"timeout"`
+	APIToken  string
+	Workspace int
+	Timeout   time.Duration
 }
 
 type Client struct {
-	apiToken  string
-	workspace string
-	timeout   time.Duration
+	apiToken    string
+	workspaceID int
+	timeout     time.Duration
 
 	c http.Client
 }
 
 func New(cfg Config) (*Client, error) {
 	c := &Client{
-		apiToken:  cfg.APIToken,
-		workspace: cfg.Workspace,
-		timeout:   cfg.Timeout,
+		apiToken:    cfg.APIToken,
+		workspaceID: cfg.Workspace,
+		timeout:     cfg.Timeout,
 	}
 
 	return c, nil
@@ -65,6 +66,9 @@ func (c *Client) call(method, url string, body io.Reader, out interface{}) error
 	}()
 
 	if resp.StatusCode != http.StatusOK {
+		if os.Getenv("DEBUG") != "" {
+			io.Copy(os.Stdout, resp.Body)
+		}
 		return fmt.Errorf("%q calling %s", resp.Status, url)
 	}
 
@@ -92,7 +96,7 @@ func (p Project) FullName() string {
 }
 
 func (c *Client) Projects() ([]Project, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/projects", baseURL, c.workspace)
+	url := fmt.Sprintf("%s/workspaces/%s/projects", baseURL, c.workspaceID)
 	var prjs []Project
 	if err := c.call("GET", url, nil, &prjs); err != nil {
 		return nil, err
@@ -114,7 +118,7 @@ func (c *Client) Projects() ([]Project, error) {
 }
 
 func (c *Client) Clients() (map[int]string, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/clients", baseURL, c.workspace)
+	url := fmt.Sprintf("%s/workspaces/%s/clients", baseURL, c.workspaceID)
 
 	var cs []struct {
 		Name string `json:"name"`
@@ -153,13 +157,15 @@ func (c *Client) Timer() (*Timer, error) {
 }
 
 func (c *Client) timesURL() string {
-	return fmt.Sprintf("%s/workspaces/%s/time_entries", baseURL, c.workspace)
+	return fmt.Sprintf("%s/workspaces/%s/time_entries", baseURL, c.workspaceID)
 }
 
 func (c *Client) Start(pid int) error {
 	data := map[string]any{
-		"duartion": -1,
-		"start":    time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		"duartion":     -1,
+		"start":        time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		"created_with": "github.com/tebeka/toggl",
+		"workspace_id": c.workspaceID,
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -198,7 +204,7 @@ func (c *Client) Report(since string) ([]Report, error) {
 
 	q := u.Query()
 	q.Set("since", since)
-	q.Set("workspace_id", c.workspace)
+	//q.Set("workspace_id", c.workspaceID)
 	q.Set("user_agent", "toggl")
 	u.RawQuery = q.Encode()
 
