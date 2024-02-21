@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sahilm/fuzzy"
+	"github.com/urfave/cli/v2"
 
 	"github.com/tebeka/toggl/client"
 )
@@ -171,6 +172,22 @@ func projectsStr(prjs []string) string {
 }
 
 func main() {
+	app := &cli.App{
+		Name:  path.Base(os.Args[0]),
+		Usage: "toggle client",
+		Action: func(*cli.Context) error {
+			fmt.Println("boom! I say!")
+			return nil
+		},
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
+}
+
+func old() {
 	log.SetFlags(0) // Don't prefix with time
 	var showVersion bool
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
