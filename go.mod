@@ -1,6 +1,6 @@
 module github.com/tebeka/toggl
 
-go 1.22
+go 1.22.1
 
 require (
 	github.com/sahilm/fuzzy v0.1.1
