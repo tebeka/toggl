@@ -1,10 +1,10 @@
 module github.com/tebeka/toggl
 
-go 1.20
+go 1.22
 
 require (
-	github.com/sahilm/fuzzy v0.1.0
-	github.com/stretchr/testify v1.8.4
+	github.com/sahilm/fuzzy v0.1.1
+	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.1
 )
 

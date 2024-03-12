@@ -109,19 +109,6 @@ func duration2str(dur time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
-func findCmd(prefix string) []string {
-	commands := []string{"start", "stop", "status", "projects", "report"}
-	var matches []string
-
-	for _, cmd := range commands {
-		if strings.HasPrefix(cmd, prefix) {
-			matches = append(matches, cmd)
-		}
-	}
-
-	return matches
-}
-
 func projectsStr(prjs []string) string {
 	s := make([]string, len(prjs))
 	copy(s, prjs)
