@@ -304,7 +304,7 @@ func main() {
 				Name:  "version",
 				Usage: "show version and exit",
 				Action: func(ctx *cli.Context) error {
-					fmt.Printf("%s\n", version)
+					fmt.Printf("%s version %s\n", ctx.App.Name, version)
 					return nil
 				},
 			},
