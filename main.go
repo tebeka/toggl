@@ -250,6 +250,64 @@ func stopCmd(ctx *cli.Context) error {
 	return nil
 }
 
+func statusCmd(ctx *cli.Context) error {
+	if ctx.NArg() != 0 {
+		return fmt.Errorf("wrong number of arguments")
+	}
+
+	c, err := newClient()
+	if err != nil {
+		return err
+	}
+
+	t, err := c.Timer()
+	if err != nil {
+		return err
+	}
+	dur := time.Since(t.Start)
+
+	prjs, err := c.Projects()
+	if err != nil {
+		return err
+	}
+
+	name := nameFromID(t.Project, prjs)
+	if name == "" {
+		name = unknownProject
+	}
+
+	fmt.Printf("%s: %s\n", name, duration2str(dur))
+	return nil
+}
+
+func reportCmd(ctx *cli.Context) error {
+	if ctx.NArg() > 1 {
+		return fmt.Errorf("wrong number of arguments")
+	}
+
+	yday := time.Now().Add(-24 * time.Hour)
+	since := yday.Format("2006-01-02")
+	if ctx.NArg() == 1 {
+		since = ctx.Args().Get(0)
+	}
+
+	c, err := newClient()
+	if err != nil {
+		return err
+	}
+
+	reps, err := c.Report(since)
+	if err != nil {
+		log.Fatalf("error: can't get report: %s", err)
+	}
+
+	for _, r := range reps {
+		fmt.Printf("%s: %s\n", r.Project, r.Duration)
+	}
+
+	return nil
+}
+
 func main() {
 	app := &cli.App{
 		Name:  path.Base(os.Args[0]),
@@ -278,6 +336,16 @@ func main() {
 				Usage:  "stop timer",
 				Action: stopCmd,
 			},
+			{
+				Name:   "status",
+				Usage:  "timer status",
+				Action: statusCmd,
+			},
+			{
+				Name:   "report",
+				Usage:  "print report",
+				Action: reportCmd,
+			},
 		},
 	}
 
@@ -286,34 +354,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-/*
-	case "status":
-		if curTimer == nil {
-			fmt.Println("no timer is running")
-			return
-		}
-		name := nameFromID(curTimer.Project, prjs)
-		if name == "" {
-			name = unknownProject
-		}
-		dur := time.Since(curTimer.Start)
-		fmt.Printf("%s: %s\n", name, duration2str(dur))
-	case "report":
-		yday := time.Now().Add(-24 * time.Hour)
-		since := yday.Format("2006-01-02")
-		if flag.NArg() == 2 {
-			since = flag.Arg(1)
-		}
-
-		reps, err := c.Report(since)
-		if err != nil {
-			log.Fatalf("error: can't get report: %s", err)
-		}
-
-		for _, r := range reps {
-			fmt.Printf("%s: %s\n", r.Project, r.Duration)
-		}
-	}
-}
-*/

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	//go:embed "testdata/projects.json"
+	//go:embed "testdata/v8/projects.json"
 	projectsJSON []byte
 )
 
@@ -25,10 +25,10 @@ func (mt mockTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 
 	rec := httptest.NewRecorder()
+	rec.Header().Set("Content-Type", "application/json")
 	if _, err := rec.Write(mt.data); err != nil {
 		return nil, err
 	}
-	rec.Header().Set("Content-Type", "application/json")
 	return rec.Result(), nil
 }
 
