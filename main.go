@@ -251,6 +251,11 @@ func statusCmd(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
+	if t == nil {
+		return fmt.Errorf("no time is running")
+	}
+
 	dur := time.Since(t.Start)
 
 	prjs, err := c.Projects()
