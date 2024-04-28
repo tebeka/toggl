@@ -2,3 +2,4 @@ toggl
 toggl-*.bz2
 
 dist/
+.envrc
