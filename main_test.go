@@ -3,6 +3,11 @@ package main
 import (
 	"os"
 	"testing"
+	"time"
+
+	"github.com/tebeka/toggl/client"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -18,7 +23,11 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if c.Workspace != "123456" {
-		t.Fatal("bad workspace")
+	expected := client.Config{
+		APIToken:    "43c48580e5ad47fa820608eca77eb161",
+		WorkspaceID: 123456,
+		Timeout:     5 * time.Second,
 	}
+
+	require.Equal(t, expected, c)
 }

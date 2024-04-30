@@ -8,6 +8,7 @@ import (
 	"os/user"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,7 +23,7 @@ const (
 )
 
 var (
-	version        = "0.4.10"
+	version        = "0.5.0"
 	unknownProject = "<unknown>"
 )
 
@@ -70,13 +71,22 @@ func loadConfig() (client.Config, error) {
 		}
 	}
 
-	c := client.Config{
-		APIToken:  cfg.APIToken,
-		Workspace: cfg.Workspace,
-		Timeout:   timeout,
+	wid, err := strconv.Atoi(cfg.Workspace)
+	if err != nil {
+		return client.Config{}, fmt.Errorf("bad workspace ID: %w", err)
 	}
-	return c, nil
 
+	c := client.Config{
+		APIToken:    cfg.APIToken,
+		WorkspaceID: int(wid),
+		Timeout:     timeout,
+	}
+
+	if err := c.Validate(); err != nil {
+		return client.Config{}, err
+	}
+
+	return c, nil
 }
 
 // fuzzy.Source interface

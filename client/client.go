@@ -13,33 +13,40 @@ import (
 )
 
 const (
-	// APIBase is the base rest API URL
-	APIBase = "https://api.track.toggl.com/api/v8"
-)
-
-var (
-	baseURL = fmt.Sprintf("%s/time_entries", APIBase)
+	// baseURL is the base rest API URL
+	baseURL = "https://api.track.toggl.com/api/v9"
 )
 
 type Config struct {
-	APIToken  string        `json:"api_token"`
-	Workspace string        `json:"workspace"`
-	Timeout   time.Duration `json:"timeout"`
+	APIToken    string
+	WorkspaceID int
+	Timeout     time.Duration
+}
+
+func (c Config) Validate() error {
+	if c.APIToken == "" {
+		return fmt.Errorf("missing API token")
+	}
+
+	if c.WorkspaceID == 0 {
+		return fmt.Errorf("missing workspace")
+	}
+
+	if c.Timeout <= 0 {
+		return fmt.Errorf("invalid timeout %v", c.Timeout)
+	}
+
+	return nil
 }
 
 type Client struct {
-	apiToken  string
-	workspace string
-	timeout   time.Duration
-
-	c http.Client
+	cfg Config
+	c   http.Client
 }
 
 func New(cfg Config) (*Client, error) {
 	c := &Client{
-		apiToken:  cfg.APIToken,
-		workspace: cfg.Workspace,
-		timeout:   cfg.Timeout,
+		cfg: cfg,
 	}
 
 	return c, nil
@@ -47,7 +54,7 @@ func New(cfg Config) (*Client, error) {
 
 // call makes an API call with right credentials
 func (c *Client) call(method, url string, body io.Reader, out interface{}) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.Timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
@@ -55,7 +62,7 @@ func (c *Client) call(method, url string, body io.Reader, out interface{}) error
 		return err
 	}
 
-	req.SetBasicAuth(c.apiToken, "api_token")
+	req.SetBasicAuth(c.cfg.APIToken, "api_token")
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.c.Do(req)
 	if err != nil {
@@ -67,10 +74,6 @@ func (c *Client) call(method, url string, body io.Reader, out interface{}) error
 			log.Printf("error: %s %s - can't close body - %s", method, url, err)
 		}
 	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%q calling %s", resp.Status, url)
-	}
 
 	if out == nil {
 		return nil
@@ -96,9 +99,9 @@ func (p Project) FullName() string {
 }
 
 func (c *Client) Projects() ([]Project, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/projects", APIBase, c.workspace)
+	url := fmt.Sprintf("%s/me/projects", baseURL)
 	var prjs []Project
-	if err := c.call("GET", url, nil, &prjs); err != nil {
+	if err := c.call(http.MethodGet, url, nil, &prjs); err != nil {
 		return nil, err
 	}
 
@@ -118,14 +121,14 @@ func (c *Client) Projects() ([]Project, error) {
 }
 
 func (c *Client) Clients() (map[int]string, error) {
-	url := fmt.Sprintf("%s/workspaces/%s/clients", APIBase, c.workspace)
+	url := fmt.Sprintf("%s/me/clients", baseURL)
 
 	var cs []struct {
 		Name string `json:"name"`
 		ID   int    `json:"id"`
 	}
 
-	if err := c.call("GET", url, nil, &cs); err != nil {
+	if err := c.call(http.MethodGet, url, nil, &cs); err != nil {
 		return nil, err
 	}
 
@@ -144,49 +147,52 @@ type Timer struct {
 }
 
 func (c *Client) Timer() (*Timer, error) {
-	url := fmt.Sprintf("%s/current", baseURL)
-	var reply struct {
-		Data *Timer `json:"data"`
-	}
+	url := fmt.Sprintf("%s/me/time_entries/current", baseURL)
+	var t Timer
 
-	if err := c.call("GET", url, nil, &reply); err != nil {
+	if err := c.call(http.MethodGet, url, nil, &t); err != nil {
 		return nil, err
 	}
 
-	return reply.Data, nil
+	if t.ID == 0 {
+		return nil, nil
+	}
+
+	return &t, nil
+}
+
+func (c *Client) timesURL() string {
+	return fmt.Sprintf("%s/workspaces/%d/time_entries", baseURL, c.cfg.WorkspaceID)
 }
 
 func (c *Client) Start(pid int) error {
-	data := map[string]interface{}{
-		"time_entry": map[string]interface{}{
-			"pid":          pid,
-			"description":  "",
-			"created_with": "toggl",
-		},
+	data := map[string]any{
+		"created_with": "github.com/tebeka/toggl",
+		"duration":     -1,
+		"project_id":   pid,
+		"start":        time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		"workspace_id": c.cfg.WorkspaceID,
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	if err := enc.Encode(data); err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/start", baseURL)
-	return c.call("POST", url, &buf, nil)
+	return c.call(http.MethodPost, c.timesURL(), &buf, nil)
 }
 
 func (c *Client) Stop(id int) (int, time.Duration, error) {
-	url := fmt.Sprintf("%s/%d/stop", baseURL, id)
+	url := fmt.Sprintf("%s/%d/stop", c.timesURL(), id)
 	var reply struct {
-		Data struct {
-			Duration int `json:"duration"`
-			ID       int `json:"pid"`
-		}
+		Duration  int `json:"duration"`
+		ProjectID int `json:"project_id"`
 	}
-	if err := c.call("PUT", url, nil, &reply); err != nil {
+	if err := c.call(http.MethodPatch, url, nil, &reply); err != nil {
 		return -1, 0, err
 	}
 
-	dur := time.Duration(time.Duration(reply.Data.Duration) * time.Second)
-	return reply.Data.ID, dur, nil
+	dur := time.Duration(time.Duration(reply.Duration) * time.Second)
+	return reply.ProjectID, dur, nil
 }
 
 type Report struct {
@@ -202,7 +208,7 @@ func (c *Client) Report(since string) ([]Report, error) {
 
 	q := u.Query()
 	q.Set("since", since)
-	q.Set("workspace_id", c.workspace)
+	q.Set("workspace_id", fmt.Sprintf("%d", c.cfg.WorkspaceID))
 	q.Set("user_agent", "toggl")
 	u.RawQuery = q.Encode()
 
@@ -215,7 +221,7 @@ func (c *Client) Report(since string) ([]Report, error) {
 		} `json:"data"`
 	}
 
-	if err := c.call("GET", u.String(), nil, &reply); err != nil {
+	if err := c.call(http.MethodGet, u.String(), nil, &reply); err != nil {
 		return nil, err
 	}
 
