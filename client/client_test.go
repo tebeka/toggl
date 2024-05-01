@@ -15,8 +15,9 @@ var (
 )
 
 type mockTripper struct {
-	data []byte
-	err  error
+	data   []byte
+	status int
+	err    error
 }
 
 func (mt mockTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -29,26 +30,43 @@ func (mt mockTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if _, err := rec.Write(mt.data); err != nil {
 		return nil, err
 	}
-	return rec.Result(), nil
+	resp := rec.Result()
+	if mt.status != 0 {
+		resp.StatusCode = mt.status
+	}
+	return resp, nil
 }
 
-func TestProjects(t *testing.T) {
-	require := require.New(t)
+func newClient(t *testing.T) *Client {
 	cfg := Config{
 		APIToken:    "api-key",
 		WorkspaceID: 1234,
 	}
 	c, err := New(cfg)
-	require.NoError(err)
+	require.NoError(t, err)
+	return c
+}
 
-	mt := mockTripper{projectsJSON, nil}
+func TestProjects(t *testing.T) {
+	c := newClient(t)
+
+	mt := mockTripper{data: projectsJSON}
 	c.c.Transport = &mt
 
 	prjs, err := c.Projects()
-	require.NoError(err)
+	require.NoError(t, err)
 	expected := []Project{
 		{"A", 1, 0, ""},
 		{"B", 2, 0, ""},
 	}
-	require.Equal(expected, prjs)
+	require.Equal(t, expected, prjs)
+}
+
+func Test_callHTTPError(t *testing.T) {
+	c := newClient(t)
+	mt := mockTripper{status: http.StatusBadRequest}
+	c.c.Transport = &mt
+
+	err := c.call("GET", "https://go.dev", nil, nil)
+	require.Error(t, err)
 }

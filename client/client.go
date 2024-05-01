@@ -75,6 +75,10 @@ func (c *Client) call(method, url string, body io.Reader, out interface{}) error
 		}
 	}()
 
+	if resp.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("%q: %s", url, resp.Status)
+	}
+
 	if out == nil {
 		return nil
 	}
