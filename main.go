@@ -312,8 +312,9 @@ func reportCmd(ctx *cli.Context) error {
 
 func main() {
 	app := &cli.App{
-		Name:  path.Base(os.Args[0]),
-		Usage: "toggle track client",
+		Name:                 path.Base(os.Args[0]),
+		Usage:                "toggle track client",
+		EnableBashCompletion: true,
 		Commands: []*cli.Command{
 			{
 				Name:  "version",
