@@ -169,12 +169,12 @@ func (c *Client) timesURL() string {
 	return fmt.Sprintf("%s/workspaces/%d/time_entries", baseURL, c.cfg.WorkspaceID)
 }
 
-func (c *Client) Start(pid int) error {
+func (c *Client) Start(pid int, start time.Time) error {
 	data := map[string]any{
 		"created_with": "github.com/tebeka/toggl",
 		"duration":     -1,
 		"project_id":   pid,
-		"start":        time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		"start":        start.Format("2006-01-02T15:04:05Z"),
 		"workspace_id": c.cfg.WorkspaceID,
 	}
 	var buf bytes.Buffer

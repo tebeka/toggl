@@ -23,7 +23,7 @@ const (
 )
 
 var (
-	version        = "0.5.0"
+	version        = "0.6.0"
 	unknownProject = "<unknown>"
 )
 
@@ -172,6 +172,15 @@ func startCmd(ctx *cli.Context) error {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
+	start := time.Now().UTC()
+	if s := ctx.String("time"); s != "" {
+		t, err := time.Parse("15:04", s)
+		if err != nil {
+			return fmt.Errorf("start: bad time (should be HH:MM) - %w", err)
+		}
+		start = time.Date(start.Year(), start.Month(), start.Day(), t.Hour(), t.Minute(), 0, 0, time.UTC)
+	}
+
 	c, err := newClient()
 	if err != nil {
 		return err
@@ -207,7 +216,7 @@ func startCmd(ctx *cli.Context) error {
 	}
 
 	fmt.Printf("Starting %s\n", matches[0].Name)
-	return c.Start(matches[0].ID)
+	return c.Start(matches[0].ID, start)
 }
 
 func stopCmd(ctx *cli.Context) error {
@@ -333,6 +342,13 @@ func main() {
 				Name:   "start",
 				Usage:  "start timer",
 				Action: startCmd,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "time",
+						Value: "",
+						Usage: "start time (HH:MM)",
+					},
+				},
 			},
 			{
 				Name:   "stop",
