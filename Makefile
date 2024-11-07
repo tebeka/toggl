@@ -9,8 +9,9 @@ lint:
 	govulncheck ./...
 	gosec ./...
 
+gosec_url=https://github.com/securego/gosec/releases/download/v2.21.4/gosec_2.21.4_linux_amd64.tar.gz
+
 install-tools:
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
-	curl -L https://github.com/securego/gosec/releases/download/v2.19.0/gosec_2.19.0_linux_amd64.tar.gz | \
-		tar -C $(shell go env GOPATH)/bin -xz gosec
+	curl -L $(gosec_url) | tar -C $(shell go env GOPATH)/bin -xz gosec
