@@ -172,14 +172,16 @@ func startCmd(ctx *cli.Context) error {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
-	start := time.Now().UTC()
+	start := time.Now()
 	if s := ctx.String("time"); s != "" {
 		t, err := time.Parse("15:04", s)
 		if err != nil {
 			return fmt.Errorf("start: bad time (should be HH:MM) - %w", err)
 		}
-		start = time.Date(start.Year(), start.Month(), start.Day(), t.Hour(), t.Minute(), 0, 0, time.UTC)
+		start = time.Date(start.Year(), start.Month(), start.Day(), t.Hour(), t.Minute(), 0, 0, start.Location())
 	}
+
+	start = start.In(time.UTC)
 
 	c, err := newClient()
 	if err != nil {
