@@ -28,10 +28,10 @@ var (
 )
 
 func configFile() (string, error) {
-	path := os.Getenv(rcEnvKey)
-	if len(path) > 0 {
+	if path := os.Getenv(rcEnvKey); len(path) > 0 {
 		return path, nil
 	}
+
 	user, err := user.Current()
 	if err != nil {
 		return "", err
@@ -69,6 +69,10 @@ func loadConfig() (client.Config, error) {
 		if err != nil {
 			return client.Config{}, err
 		}
+	}
+
+	if timeout <= 0 {
+		return client.Config{}, fmt.Errorf("bad timeout - %v", timeout)
 	}
 
 	wid, err := strconv.Atoi(cfg.Workspace)
