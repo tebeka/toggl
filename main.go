@@ -5,15 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"os/user"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/sahilm/fuzzy"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 
 	"github.com/tebeka/toggl/client"
 )
@@ -93,17 +95,17 @@ func loadConfig() (client.Config, error) {
 	return c, nil
 }
 
-// fuzzy.Source interface
-type projects []client.Project
-
-func (ps projects) String(i int) string { return ps[i].FullName() }
-func (ps projects) Len() int            { return len(ps) }
-
 func findProject(name string, prjs []client.Project) []client.Project {
-	matches := fuzzy.FindFrom(name, projects(prjs))
+	projects := make(map[string]client.Project)
+	for _, prj := range prjs {
+		projects[prj.Name] = prj
+	}
+	names := slices.Collect(maps.Keys(projects))
+
+	matches := fuzzy.Find(name, names)
 	out := make([]client.Project, len(matches))
 	for i, m := range matches {
-		out[i] = prjs[m.Index]
+		out[i] = projects[m]
 	}
 	return out
 }
@@ -139,8 +141,24 @@ func newClient() (*client.Client, error) {
 	return client.New(cfg)
 }
 
+func exeName() string {
+	return path.Base(os.Args[0])
+}
+
+func simpleHelp(fs *flag.FlagSet, cmd, desc string) {
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s %s\n%s\n\n", exeName(), cmd, desc)
+		fs.PrintDefaults()
+	}
+}
+
 func projectsCmd(args []string) error {
-	if len(args) != 0 {
+	fs := flag.NewFlagSet("projects", flag.ExitOnError)
+	simpleHelp(fs, "projects", "List projects.")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
@@ -172,15 +190,15 @@ func projectsCmd(args []string) error {
 }
 
 func startCmd(args []string) error {
-	startFlagSet := flag.NewFlagSet("start", flag.ExitOnError)
-	startTime := startFlagSet.String("time", "", "start time (HH:MM)")
+	fs := flag.NewFlagSet("start", flag.ExitOnError)
+	startTime := fs.String("time", "", "start time (HH:MM)")
+	simpleHelp(fs, "start [flags] <project>", "Start timer.")
 
-	if err := startFlagSet.Parse(args); err != nil {
+	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	parsedArgs := startFlagSet.Args()
-	if len(parsedArgs) != 1 {
+	if fs.NArg() != 1 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
@@ -214,7 +232,7 @@ func startCmd(args []string) error {
 		return err
 	}
 
-	name := parsedArgs[0]
+	name := fs.Arg(0)
 	matches := findProject(name, prjs)
 	switch len(matches) {
 	case 0:
@@ -234,7 +252,12 @@ func startCmd(args []string) error {
 }
 
 func stopCmd(args []string) error {
-	if len(args) != 0 {
+	fs := flag.NewFlagSet("stop", flag.ExitOnError)
+	simpleHelp(fs, "stop", "Stop timer.")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
@@ -271,7 +294,12 @@ func stopCmd(args []string) error {
 }
 
 func statusCmd(args []string) error {
-	if len(args) != 0 {
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	simpleHelp(fs, "status", "Show timer status.")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
@@ -306,14 +334,22 @@ func statusCmd(args []string) error {
 }
 
 func reportCmd(args []string) error {
-	if len(args) > 1 {
+	fs := flag.NewFlagSet("report", flag.ExitOnError)
+	simpleHelp(fs, "report [date]", "Print report.")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	switch fs.NArg() {
+	case 0, 1:
+		// OK
+	default:
 		return fmt.Errorf("wrong number of arguments")
 	}
 
 	yday := time.Now().Add(-24 * time.Hour)
 	since := yday.Format("2006-01-02")
-	if len(args) == 1 {
-		since = args[0]
+	if fs.NArg() == 1 {
+		since = fs.Arg(0)
 	}
 
 	c, err := newClient()
@@ -334,9 +370,15 @@ func reportCmd(args []string) error {
 }
 
 func versionCmd(args []string) error {
-	if len(args) != 0 {
+	fs := flag.NewFlagSet("version", flag.ExitOnError)
+	simpleHelp(fs, "version", "Show version and exit.")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
 		return fmt.Errorf("wrong number of arguments")
 	}
+
 	fmt.Printf("%s version %s\n", path.Base(os.Args[0]), version)
 	return nil
 }
