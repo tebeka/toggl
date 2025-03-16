@@ -4,9 +4,8 @@ import (
 	_ "embed"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -43,7 +42,9 @@ func newClient(t *testing.T) *Client {
 		WorkspaceID: 1234,
 	}
 	c, err := New(cfg)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return c
 }
 
@@ -54,12 +55,16 @@ func TestProjects(t *testing.T) {
 	c.c.Transport = &mt
 
 	prjs, err := c.Projects()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	expected := []Project{
 		{"A", 1, 0, ""},
 		{"B", 2, 0, ""},
 	}
-	require.Equal(t, expected, prjs)
+	if !slices.Equal(prjs, expected) {
+		t.Errorf("expected %v, got %v", expected, prjs)
+	}
 }
 
 func Test_callHTTPError(t *testing.T) {
@@ -68,5 +73,7 @@ func Test_callHTTPError(t *testing.T) {
 	c.c.Transport = &mt
 
 	err := c.call("GET", "https://go.dev", nil, nil)
-	require.Error(t, err)
+	if err == nil {
+		t.Fatal(err)
+	}
 }

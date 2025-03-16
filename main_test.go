@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/tebeka/toggl/client"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -29,5 +27,7 @@ func TestLoadConfig(t *testing.T) {
 		Timeout:     5 * time.Second,
 	}
 
-	require.Equal(t, expected, c)
+	if c != expected {
+		t.Errorf("expected %v, got %v", expected, c)
+	}
 }
