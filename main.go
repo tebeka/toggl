@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/sahilm/fuzzy"
-	"github.com/urfave/cli/v2"
 
 	"github.com/tebeka/toggl/client"
 )
@@ -139,8 +139,8 @@ func newClient() (*client.Client, error) {
 	return client.New(cfg)
 }
 
-func projectsCmd(ctx *cli.Context) error {
-	if ctx.NArg() != 0 {
+func projectsCmd(args []string) error {
+	if len(args) != 0 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
@@ -171,14 +171,22 @@ func projectsCmd(ctx *cli.Context) error {
 	return nil
 }
 
-func startCmd(ctx *cli.Context) error {
-	if ctx.NArg() != 1 {
+func startCmd(args []string) error {
+	startFlagSet := flag.NewFlagSet("start", flag.ExitOnError)
+	startTime := startFlagSet.String("time", "", "start time (HH:MM)")
+
+	if err := startFlagSet.Parse(args); err != nil {
+		return err
+	}
+
+	parsedArgs := startFlagSet.Args()
+	if len(parsedArgs) != 1 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
 	start := time.Now()
-	if s := ctx.String("time"); s != "" {
-		t, err := time.Parse("15:04", s)
+	if *startTime != "" {
+		t, err := time.Parse("15:04", *startTime)
 		if err != nil {
 			return fmt.Errorf("start: bad time (should be HH:MM) - %w", err)
 		}
@@ -206,7 +214,7 @@ func startCmd(ctx *cli.Context) error {
 		return err
 	}
 
-	name := ctx.Args().Get(0)
+	name := parsedArgs[0]
 	matches := findProject(name, prjs)
 	switch len(matches) {
 	case 0:
@@ -225,8 +233,8 @@ func startCmd(ctx *cli.Context) error {
 	return c.Start(matches[0].ID, start)
 }
 
-func stopCmd(ctx *cli.Context) error {
-	if ctx.NArg() != 0 {
+func stopCmd(args []string) error {
+	if len(args) != 0 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
@@ -262,8 +270,8 @@ func stopCmd(ctx *cli.Context) error {
 	return nil
 }
 
-func statusCmd(ctx *cli.Context) error {
-	if ctx.NArg() != 0 {
+func statusCmd(args []string) error {
+	if len(args) != 0 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
@@ -297,15 +305,15 @@ func statusCmd(ctx *cli.Context) error {
 	return nil
 }
 
-func reportCmd(ctx *cli.Context) error {
-	if ctx.NArg() > 1 {
+func reportCmd(args []string) error {
+	if len(args) > 1 {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
 	yday := time.Now().Add(-24 * time.Hour)
 	since := yday.Format("2006-01-02")
-	if ctx.NArg() == 1 {
-		since = ctx.Args().Get(0)
+	if len(args) == 1 {
+		since = args[0]
 	}
 
 	c, err := newClient()
@@ -325,56 +333,56 @@ func reportCmd(ctx *cli.Context) error {
 	return nil
 }
 
+func versionCmd(args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("wrong number of arguments")
+	}
+	fmt.Printf("%s version %s\n", path.Base(os.Args[0]), version)
+	return nil
+}
+
+func printUsage() {
+	progName := path.Base(os.Args[0])
+	fmt.Fprintf(os.Stderr, "Usage: %s <command> [arguments]\n\n", progName)
+	fmt.Fprintf(os.Stderr, "The commands are:\n")
+	fmt.Fprintf(os.Stderr, "  version     show version and exit\n")
+	fmt.Fprintf(os.Stderr, "  projects    show workspace projects\n")
+	fmt.Fprintf(os.Stderr, "  start       start timer\n")
+	fmt.Fprintf(os.Stderr, "  stop        stop timer\n")
+	fmt.Fprintf(os.Stderr, "  status      timer status\n")
+	fmt.Fprintf(os.Stderr, "  report      print report\n\n")
+	fmt.Fprintf(os.Stderr, "Use \"%s <command> -h\" for more information about a command.\n", progName)
+}
+
 func main() {
-	app := &cli.App{
-		Name:                 path.Base(os.Args[0]),
-		Usage:                "toggle track client",
-		EnableBashCompletion: true,
-		Commands: []*cli.Command{
-			{
-				Name:  "version",
-				Usage: "show version and exit",
-				Action: func(ctx *cli.Context) error {
-					fmt.Printf("%s version %s\n", ctx.App.Name, version)
-					return nil
-				},
-			},
-			{
-				Name:   "projects",
-				Usage:  "show workspace projects",
-				Action: projectsCmd,
-			},
-			{
-				Name:   "start",
-				Usage:  "start timer",
-				Action: startCmd,
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:  "time",
-						Value: "",
-						Usage: "start time (HH:MM)",
-					},
-				},
-			},
-			{
-				Name:   "stop",
-				Usage:  "stop timer",
-				Action: stopCmd,
-			},
-			{
-				Name:   "status",
-				Usage:  "timer status",
-				Action: statusCmd,
-			},
-			{
-				Name:   "report",
-				Usage:  "print report",
-				Action: reportCmd,
-			},
-		},
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	var err error
+	cmd := os.Args[1]
+	args := os.Args[2:]
+
+	switch cmd {
+	case "version":
+		err = versionCmd(args)
+	case "projects":
+		err = projectsCmd(args)
+	case "start":
+		err = startCmd(args)
+	case "stop":
+		err = stopCmd(args)
+	case "status":
+		err = statusCmd(args)
+	case "report":
+		err = reportCmd(args)
+	default:
+		printUsage()
+		os.Exit(1)
+	}
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
 	}
