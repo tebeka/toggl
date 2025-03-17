@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -29,5 +30,32 @@ func TestLoadConfig(t *testing.T) {
 
 	if c != expected {
 		t.Errorf("expected %v, got %v", expected, c)
+	}
+}
+
+func Test_findProject(t *testing.T) {
+	projects := []client.Project{
+		{ID: 1, Name: "cartwheel"},
+		{ID: 2, Name: "jump"},
+		{ID: 1, Name: "wheel"},
+		{ID: 2, Name: "walk"},
+	}
+
+	cases := []struct {
+		query    string
+		expected []client.Project
+	}{
+		{"whl", []client.Project{projects[0], projects[2]}},
+		{"jmp", []client.Project{projects[1]}},
+		{"banana", nil},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.query, func(t *testing.T) {
+			found := findProject(tc.query, projects)
+			if !slices.Equal(found, tc.expected) {
+				t.Errorf("expected %#v, got %#v", tc.expected, found)
+			}
+		})
 	}
 }
