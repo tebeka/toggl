@@ -96,9 +96,10 @@ func loadConfig() (client.Config, error) {
 }
 
 func findProject(name string, prjs []client.Project) []client.Project {
+	name = strings.ToLower(name)
 	projects := make(map[string]client.Project)
 	for _, prj := range prjs {
-		projects[prj.Name] = prj
+		projects[strings.ToLower(prj.Name)] = prj
 	}
 	names := slices.Collect(maps.Keys(projects))
 
@@ -419,6 +420,9 @@ func main() {
 		err = statusCmd(args)
 	case "report":
 		err = reportCmd(args)
+	case "-h", "--help":
+		printUsage()
+		os.Exit(0)
 	default:
 		printUsage()
 		os.Exit(1)
