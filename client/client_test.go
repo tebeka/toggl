@@ -1,41 +1,31 @@
 package client
 
 import (
-	_ "embed"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
-)
-
-var (
-	//go:embed "testdata/v8/projects.json"
-	projectsJSON []byte
-
-	//go:embed "testdata/v8/clients.json"
-	clientsJSON []byte
-
-	//go:embed "testdata/v8/timer.json"
-	timerJSON []byte
-
-	//go:embed "testdata/v8/timer_empty.json"
-	timerEmptyJSON []byte
-
-	//go:embed "testdata/v8/start_timer.json"
-	startTimerJSON []byte
-
-	//go:embed "testdata/v8/stop_timer.json"
-	stopTimerJSON []byte
-
-	//go:embed "testdata/v8/report.json"
-	reportJSON []byte
 )
 
 type mockTripper struct {
 	data   []byte
 	status int
 	err    error
+}
+
+// loadTestData loads a JSON test file from disk
+// filename should be just the base filename (e.g., "projects.json")
+func loadTestData(t *testing.T, filename string) []byte {
+	t.Helper()
+	path := filepath.Join("testdata", "v8", filename)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to load test data %s: %v", path, err)
+	}
+	return data
 }
 
 func (mt mockTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -148,7 +138,7 @@ func TestProjects(t *testing.T) {
 	c := newClient(t)
 
 	// First, we need to mock the Projects endpoint
-	c.c.Transport = &mockTripper{data: projectsJSON}
+	c.c.Transport = &mockTripper{data: loadTestData(t, "projects.json")}
 
 	prjs, err := c.Projects()
 	if err != nil {
@@ -165,7 +155,7 @@ func TestProjects(t *testing.T) {
 
 func TestClients(t *testing.T) {
 	c := newClient(t)
-	c.c.Transport = &mockTripper{data: clientsJSON}
+	c.c.Transport = &mockTripper{data: loadTestData(t, "clients.json")}
 
 	clients, err := c.Clients()
 	if err != nil {
@@ -224,7 +214,7 @@ func TestProjectFullName(t *testing.T) {
 func TestTimer(t *testing.T) {
 	t.Run("timer running", func(t *testing.T) {
 		c := newClient(t)
-		c.c.Transport = &mockTripper{data: timerJSON}
+		c.c.Transport = &mockTripper{data: loadTestData(t, "timer.json")}
 
 		timer, err := c.Timer()
 		if err != nil {
@@ -253,7 +243,7 @@ func TestTimer(t *testing.T) {
 
 	t.Run("no timer running", func(t *testing.T) {
 		c := newClient(t)
-		c.c.Transport = &mockTripper{data: timerEmptyJSON}
+		c.c.Transport = &mockTripper{data: loadTestData(t, "timer_empty.json")}
 
 		timer, err := c.Timer()
 		if err != nil {
@@ -268,7 +258,7 @@ func TestTimer(t *testing.T) {
 
 func TestStart(t *testing.T) {
 	c := newClient(t)
-	c.c.Transport = &mockTripper{data: startTimerJSON}
+	c.c.Transport = &mockTripper{data: loadTestData(t, "start_timer.json")}
 
 	projectID := 123
 	startTime := time.Now()
@@ -281,7 +271,7 @@ func TestStart(t *testing.T) {
 
 func TestStop(t *testing.T) {
 	c := newClient(t)
-	c.c.Transport = &mockTripper{data: stopTimerJSON}
+	c.c.Transport = &mockTripper{data: loadTestData(t, "stop_timer.json")}
 
 	timerID := 456
 	projectID, duration, err := c.Stop(timerID)
@@ -302,7 +292,7 @@ func TestStop(t *testing.T) {
 
 func TestReport(t *testing.T) {
 	c := newClient(t)
-	c.c.Transport = &mockTripper{data: reportJSON}
+	c.c.Transport = &mockTripper{data: loadTestData(t, "report.json")}
 
 	reports, err := c.Report("2023-01-01")
 	if err != nil {
