@@ -384,17 +384,39 @@ func versionCmd(args []string) error {
 	return nil
 }
 
+type cmd struct {
+	name string
+	desc string
+	fn   func([]string) error
+}
+
+var cmds = []cmd{
+	{"projects", "show workspace projects", projectsCmd},
+	{"report", "print report", reportCmd},
+	{"start", "start timer", startCmd},
+	{"status", "timer status", statusCmd},
+	{"stop", "stop timer", stopCmd},
+	{"version", "show version and exit", versionCmd},
+}
+
 func printUsage() {
 	progName := path.Base(os.Args[0])
 	fmt.Fprintf(os.Stderr, "Usage: %s <command> [arguments]\n\n", progName)
 	fmt.Fprintf(os.Stderr, "The commands are:\n")
-	fmt.Fprintf(os.Stderr, "  version     show version and exit\n")
-	fmt.Fprintf(os.Stderr, "  projects    show workspace projects\n")
-	fmt.Fprintf(os.Stderr, "  start       start timer\n")
-	fmt.Fprintf(os.Stderr, "  stop        stop timer\n")
-	fmt.Fprintf(os.Stderr, "  status      timer status\n")
-	fmt.Fprintf(os.Stderr, "  report      print report\n\n")
+	for _, cmd := range cmds {
+		fmt.Fprintf(os.Stderr, "  %s    %s\n", cmd.name, cmd.desc)
+	}
 	fmt.Fprintf(os.Stderr, "Use \"%s <command> -h\" for more information about a command.\n", progName)
+}
+
+func findCmd(name string) cmd {
+	for _, c := range cmds {
+		if c.name == name {
+			return c
+		}
+	}
+
+	return cmd{}
 }
 
 func main() {
@@ -403,32 +425,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	var err error
-	cmd := os.Args[1]
-	args := os.Args[2:]
-
-	switch cmd {
-	case "version":
-		err = versionCmd(args)
-	case "projects":
-		err = projectsCmd(args)
-	case "start":
-		err = startCmd(args)
-	case "stop":
-		err = stopCmd(args)
-	case "status":
-		err = statusCmd(args)
-	case "report":
-		err = reportCmd(args)
+	cmdName := os.Args[1]
+	switch cmdName {
 	case "-h", "--help":
 		printUsage()
 		os.Exit(0)
-	default:
+	}
+
+	args := os.Args[2:]
+
+	cmd := findCmd(cmdName)
+	if cmd.fn == nil {
 		printUsage()
 		os.Exit(1)
 	}
 
-	if err != nil {
+	if err := cmd.fn(args); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
 	}

@@ -119,16 +119,16 @@ func TestNew(t *testing.T) {
 		WorkspaceID: 123,
 		Timeout:     time.Second * 30,
 	}
-	
+
 	client, err := New(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	if client == nil {
 		t.Fatal("expected client but got nil")
 	}
-	
+
 	if client.cfg != cfg {
 		t.Errorf("expected config %v, got %v", cfg, client.cfg)
 	}
@@ -312,7 +312,7 @@ func TestReport(t *testing.T) {
 		if report.Project != expected[i].Project {
 			t.Errorf("expected project %q, got %q", expected[i].Project, report.Project)
 		}
-		
+
 		if report.Duration != expected[i].Duration {
 			t.Errorf("expected duration %v, got %v", expected[i].Duration, report.Duration)
 		}
@@ -334,7 +334,7 @@ func Test_timesURL(t *testing.T) {
 	c := newClient(t)
 	url := c.timesURL()
 	expected := "https://api.track.toggl.com/api/v9/workspaces/1234/time_entries"
-	
+
 	if url != expected {
 		t.Errorf("expected URL %q, got %q", expected, url)
 	}
