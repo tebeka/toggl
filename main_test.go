@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"slices"
+	"sort"
 	"testing"
 	"time"
 
@@ -37,8 +38,8 @@ func Test_findProject(t *testing.T) {
 	projects := []client.Project{
 		{ID: 1, Name: "cartwheel"},
 		{ID: 2, Name: "jump"},
-		{ID: 1, Name: "wheel"},
-		{ID: 2, Name: "walk"},
+		{ID: 3, Name: "wheel"},
+		{ID: 4, Name: "walk"},
 	}
 
 	cases := []struct {
@@ -53,6 +54,10 @@ func Test_findProject(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.query, func(t *testing.T) {
 			found := findProject(tc.query, projects)
+			sort.Slice(found, func(i, j int) bool {
+				return found[i].ID < found[j].ID
+			})
+
 			if !slices.Equal(found, tc.expected) {
 				t.Errorf("expected %#v, got %#v", tc.expected, found)
 			}
