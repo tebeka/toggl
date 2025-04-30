@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"slices"
 	"sort"
 	"testing"
@@ -62,5 +64,19 @@ func Test_findProject(t *testing.T) {
 				t.Errorf("expected %#v, got %#v", tc.expected, found)
 			}
 		})
+	}
+}
+
+func TestBadReportDate(t *testing.T) {
+	dir := t.TempDir()
+	exe := fmt.Sprintf("%s/%s", dir, "toggl")
+	cmd := exec.Command("go", "build", "-o", exe, ".")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd = exec.Command(exe, "report", "01-02-2023")
+	if err := cmd.Run(); err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }

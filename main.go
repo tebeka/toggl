@@ -351,6 +351,9 @@ func reportCmd(args []string) error {
 	since := yday.Format("2006-01-02")
 	if fs.NArg() == 1 {
 		since = fs.Arg(0)
+		if _, err := time.Parse("2006-01-02", since); err != nil {
+			return fmt.Errorf("date format should be YYYY-MM-DD (got %q)", since)
+		}
 	}
 
 	c, err := newClient()
