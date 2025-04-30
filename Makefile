@@ -9,12 +9,6 @@ lint:
 	govulncheck ./...
 	gosec --terse --fmt golint ./...
 
-install-tools:
-	go install honnef.co/go/tools/cmd/staticcheck@latest
-	go install golang.org/x/vuln/cmd/govulncheck@latest
-	./install-gosec.sh
-	go install github.com/caarlos0/svu@latest
-
 release-patch:
 	git tag $(shell svu patch)
 	git push --tags
