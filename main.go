@@ -237,7 +237,7 @@ func startCmd(args []string) error {
 	matches := findProject(name, prjs)
 	switch len(matches) {
 	case 0:
-		log.Fatalf("error: no project match %s", name)
+		return fmt.Errorf("error: no project match %s", name)
 	case 1:
 	default:
 		names := make([]string, len(matches))
@@ -315,7 +315,7 @@ func statusCmd(args []string) error {
 	}
 
 	if t == nil {
-		return fmt.Errorf("no time is running")
+		return fmt.Errorf("no timer is running")
 	}
 
 	dur := time.Since(t.Start)
