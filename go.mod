@@ -1,13 +1,6 @@
 module github.com/tebeka/toggl
 
-go 1.24
-
-tool (
-	github.com/caarlos0/svu
-	github.com/securego/gosec/v2/cmd/gosec
-	golang.org/x/vuln/cmd/govulncheck
-	honnef.co/go/tools/cmd/staticcheck
-)
+go 1.26
 
 require github.com/lithammer/fuzzysearch v1.1.8
 
