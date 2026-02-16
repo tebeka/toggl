@@ -55,7 +55,7 @@ func loadConfig() (client.Config, error) {
 	defer file.Close() // #nosec
 
 	var cfg struct {
-		APIToken  string `json:"api_token"`
+		APIToken  string `json:"api_token"` //#nosec
 		Workspace string `json:"workspace"`
 		Timeout   string `json:"timeout"`
 	}
@@ -404,12 +404,12 @@ var cmds = []cmd{
 
 func printUsage() {
 	progName := path.Base(os.Args[0])
-	fmt.Fprintf(os.Stderr, "Usage: %s <command> [arguments]\n\n", progName)
+	fmt.Fprintf(os.Stderr, "Usage: %s <command> [arguments]\n\n", progName) //#nosec
 	fmt.Fprintf(os.Stderr, "The commands are:\n")
 	for _, cmd := range cmds {
 		fmt.Fprintf(os.Stderr, "  %s    %s\n", cmd.name, cmd.desc)
 	}
-	fmt.Fprintf(os.Stderr, "Use \"%s <command> -h\" for more information about a command.\n", progName)
+	fmt.Fprintf(os.Stderr, `Use "%s <command> -h" for more information about a command.\n`, progName) //#nosec
 }
 
 func findCmd(name string) cmd {

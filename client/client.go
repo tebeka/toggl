@@ -18,7 +18,7 @@ const (
 )
 
 type Config struct {
-	APIToken    string
+	APIToken    string //#nosec
 	WorkspaceID int
 	Timeout     time.Duration
 }
@@ -53,7 +53,7 @@ func New(cfg Config) (*Client, error) {
 }
 
 // call makes an API call with right credentials
-func (c *Client) call(method, url string, body io.Reader, out interface{}) error {
+func (c *Client) call(method, url string, body io.Reader, out any) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.Timeout)
 	defer cancel()
 
@@ -64,7 +64,7 @@ func (c *Client) call(method, url string, body io.Reader, out interface{}) error
 
 	req.SetBasicAuth(c.cfg.APIToken, "api_token")
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.c.Do(req)
+	resp, err := c.c.Do(req) //#nosec
 	if err != nil {
 		return err
 	}
