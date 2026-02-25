@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"runtime/debug"
+
 	"github.com/lithammer/fuzzysearch/fuzzy"
 
 	"github.com/tebeka/toggl/client"
@@ -24,10 +26,7 @@ const (
 	rcEnvKey = "TOGGLRC"
 )
 
-var (
-	version        = "0.8.1"
-	unknownProject = "<unknown>"
-)
+var unknownProject = "<unknown>"
 
 func configFile() (string, error) {
 	if path := os.Getenv(rcEnvKey); len(path) > 0 {
@@ -383,6 +382,10 @@ func versionCmd(args []string) error {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
+	version := "unknown"
+	if info, ok := debug.ReadBuildInfo(); ok {
+		version = info.Main.Version
+	}
 	fmt.Printf("%s version %s\n", path.Base(os.Args[0]), version)
 	return nil
 }
