@@ -335,7 +335,7 @@ func statusCmd(args []string) error {
 
 func reportCmd(args []string) error {
 	fs := flag.NewFlagSet("report", flag.ExitOnError)
-	simpleHelp(fs, "report [date]", "Print report.")
+	simpleHelp(fs, "report [YYYY-MM-DD]", "Print report, default to yesterday.")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
