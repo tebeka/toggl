@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -184,6 +185,42 @@ func projectsCmd(args []string) error {
 	sort.Slice(names, cmp)
 	for _, name := range names {
 		fmt.Println(name)
+	}
+
+	return nil
+}
+
+func workspacesCmd(args []string) error {
+	fs := flag.NewFlagSet("workspaces", flag.ExitOnError)
+	simpleHelp(fs, "workspaces", "List workspaces.")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return fmt.Errorf("wrong number of arguments")
+	}
+
+	c, err := newClient()
+	if err != nil {
+		return err
+	}
+
+	ws, err := c.Workspaces()
+	if err != nil {
+		return err
+	}
+
+	slices.SortFunc(ws, func(w1, w2 client.Workspace) int {
+		return cmp.Compare(w1.Name, w2.Name)
+	})
+
+	size := 0
+	for _, w := range ws {
+		size = max(size, len(w.Name))
+	}
+
+	for _, w := range ws {
+		fmt.Printf("%-*s %d\n", size, w.Name, w.ID)
 	}
 
 	return nil
@@ -403,6 +440,7 @@ var cmds = []cmd{
 	{"status", "timer status", statusCmd},
 	{"stop", "stop timer", stopCmd},
 	{"version", "show version and exit", versionCmd},
+	{"workspaces", "show workspaces", workspacesCmd},
 }
 
 func printUsage() {

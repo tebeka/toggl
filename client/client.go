@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -76,6 +77,9 @@ func (c *Client) call(method, url string, body io.Reader, out any) error {
 	}()
 
 	if resp.StatusCode >= http.StatusBadRequest {
+		if os.Getenv("DEBUG") != "" {
+			io.Copy(os.Stderr, resp.Body) // #nosec: CWE-703
+		}
 		return fmt.Errorf("%q: %s", url, resp.Status)
 	}
 
@@ -122,6 +126,21 @@ func (c *Client) Projects() ([]Project, error) {
 	}
 
 	return prjs, nil
+}
+
+type Workspace struct {
+	ID   int
+	Name string
+}
+
+func (c *Client) Workspaces() ([]Workspace, error) {
+	url := fmt.Sprintf("%s/me/workspaces", baseURL)
+	var ws []Workspace
+	if err := c.call(http.MethodGet, url, nil, &ws); err != nil {
+		return nil, err
+	}
+
+	return ws, nil
 }
 
 func (c *Client) Clients() (map[int]string, error) {
