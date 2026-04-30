@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -18,7 +19,9 @@ import (
 
 	"runtime/debug"
 
+	"charm.land/huh/v2"
 	"github.com/lithammer/fuzzysearch/fuzzy"
+	"golang.org/x/term"
 
 	"github.com/tebeka/toggl/client"
 )
@@ -153,6 +156,85 @@ func simpleHelp(fs *flag.FlagSet, cmd, desc string) {
 	}
 }
 
+func isTTY() bool {
+	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stderr.Fd()))
+}
+
+func selectProject(prjs []client.Project) (client.Project, error) {
+	if len(prjs) == 0 {
+		return client.Project{}, fmt.Errorf("no projects found")
+	}
+
+	slices.SortFunc(prjs, func(p1, p2 client.Project) int {
+		return cmp.Compare(strings.ToLower(p1.FullName()), strings.ToLower(p2.FullName()))
+	})
+
+	options := make([]huh.Option[int], len(prjs))
+	selected := prjs[0].ID
+	for i, prj := range prjs {
+		options[i] = huh.NewOption(prj.FullName(), prj.ID)
+	}
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[int]().
+				Title("Project").
+				Description("Select a project to start").
+				Filtering(true).
+				Options(options...).
+				Value(&selected),
+		),
+	).WithShowHelp(false).
+		WithInput(os.Stdin).
+		WithOutput(os.Stderr)
+
+	if err := form.Run(); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return client.Project{}, fmt.Errorf("project selection canceled")
+		}
+
+		return client.Project{}, err
+	}
+
+	for _, prj := range prjs {
+		if prj.ID == selected {
+			return prj, nil
+		}
+	}
+
+	return client.Project{}, fmt.Errorf("selected unknown project")
+}
+
+func resolveStartProject(args []string, prjs []client.Project, interactive bool, chooser func([]client.Project) (client.Project, error)) (client.Project, error) {
+	switch len(args) {
+	case 0:
+		if !interactive {
+			return client.Project{}, fmt.Errorf("wrong number of arguments")
+		}
+
+		return chooser(prjs)
+	case 1:
+	default:
+		return client.Project{}, fmt.Errorf("wrong number of arguments")
+	}
+
+	name := args[0]
+	matches := findProject(name, prjs)
+	switch len(matches) {
+	case 0:
+		return client.Project{}, fmt.Errorf("error: no project match %s", name)
+	case 1:
+		return matches[0], nil
+	default:
+		names := make([]string, len(matches))
+		for i, p := range matches {
+			names[i] = p.Name
+		}
+
+		return client.Project{}, fmt.Errorf("too many matches to %q: %s", name, projectsStr(names))
+	}
+}
+
 func projectsCmd(args []string) error {
 	fs := flag.NewFlagSet("projects", flag.ExitOnError)
 	simpleHelp(fs, "projects", "List projects.")
@@ -229,13 +311,13 @@ func workspacesCmd(args []string) error {
 func startCmd(args []string) error {
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
 	startTime := fs.String("time", "", "start time (HH:MM)")
-	simpleHelp(fs, "start [flags] <project>", "Start timer.")
+	simpleHelp(fs, "start [flags] [project]", "Start timer.")
 
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	if fs.NArg() != 1 {
+	if fs.NArg() > 1 || (fs.NArg() == 0 && !isTTY()) {
 		return fmt.Errorf("wrong number of arguments")
 	}
 
@@ -269,23 +351,13 @@ func startCmd(args []string) error {
 		return err
 	}
 
-	name := fs.Arg(0)
-	matches := findProject(name, prjs)
-	switch len(matches) {
-	case 0:
-		return fmt.Errorf("error: no project match %s", name)
-	case 1:
-	default:
-		names := make([]string, len(matches))
-		for i, p := range matches {
-			names[i] = p.Name
-		}
-
-		return fmt.Errorf("too many matches to %q: %s", name, projectsStr(names))
+	prj, err := resolveStartProject(fs.Args(), prjs, isTTY(), selectProject)
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf("Starting %s\n", matches[0].Name)
-	return c.Start(matches[0].ID, start)
+	fmt.Printf("Starting %s\n", prj.Name)
+	return c.Start(prj.ID, start)
 }
 
 func stopCmd(args []string) error {

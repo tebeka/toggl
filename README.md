@@ -8,8 +8,8 @@ This is a simple command line to start/stop timers on
 ## Usage
 
     $ toggl -h
-    usage: toggl start <project>|stop|status|projects|report <since>
-	    <project> - project name
+    usage: toggl start [project]|stop|status|projects|report <since>
+	    [project] - project name (optional in a TTY)
 	    <since> - YYYY-MM-DD (default to start of today)
       -version
 	    show version and exit

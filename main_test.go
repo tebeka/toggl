@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -65,6 +66,94 @@ func Test_findProject(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResolveStartProject(t *testing.T) {
+	projects := []client.Project{
+		{ID: 1, Name: "cartwheel"},
+		{ID: 2, Name: "jump"},
+		{ID: 3, Name: "wheel"},
+	}
+
+	t.Run("single match", func(t *testing.T) {
+		prj, err := resolveStartProject([]string{"jmp"}, projects, false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if prj != projects[1] {
+			t.Fatalf("expected %#v, got %#v", projects[1], prj)
+		}
+	})
+
+	t.Run("no match", func(t *testing.T) {
+		_, err := resolveStartProject([]string{"banana"}, projects, false, nil)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		expected := "error: no project match banana"
+		if err.Error() != expected {
+			t.Fatalf("expected %q, got %q", expected, err)
+		}
+	})
+
+	t.Run("multiple matches", func(t *testing.T) {
+		_, err := resolveStartProject([]string{"whl"}, projects, false, nil)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		expected := `too many matches to "whl": cartwheel, wheel`
+		if err.Error() != expected {
+			t.Fatalf("expected %q, got %q", expected, err)
+		}
+	})
+
+	t.Run("interactive chooser", func(t *testing.T) {
+		called := false
+		prj, err := resolveStartProject(nil, projects, true, func(got []client.Project) (client.Project, error) {
+			called = true
+			if !slices.Equal(got, projects) {
+				t.Fatalf("expected %#v, got %#v", projects, got)
+			}
+
+			return projects[2], nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !called {
+			t.Fatal("chooser was not called")
+		}
+
+		if prj != projects[2] {
+			t.Fatalf("expected %#v, got %#v", projects[2], prj)
+		}
+	})
+
+	t.Run("chooser error", func(t *testing.T) {
+		expected := errors.New("selection failed")
+		_, err := resolveStartProject(nil, projects, true, func([]client.Project) (client.Project, error) {
+			return client.Project{}, expected
+		})
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected %v, got %v", expected, err)
+		}
+	})
+
+	t.Run("non interactive needs argument", func(t *testing.T) {
+		_, err := resolveStartProject(nil, projects, false, nil)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		expected := "wrong number of arguments"
+		if err.Error() != expected {
+			t.Fatalf("expected %q, got %q", expected, err)
+		}
+	})
 }
 
 func TestBadReportDate(t *testing.T) {
