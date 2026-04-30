@@ -10,9 +10,9 @@ lint:
 	go tool gosec --terse --fmt golint ./...
 
 release-patch:
-	git tag $(shell go tool svu patch)
+	git tag "$(shell go tool svu patch)"
 	git push --tags
 
 release-minor:
-	git tag $(shell go tool svu minor)
+	git tag "$(shell go tool svu minor)"
 	git push --tags
