@@ -156,6 +156,43 @@ func TestResolveStartProject(t *testing.T) {
 	})
 }
 
+func TestFindCmd(t *testing.T) {
+	t.Run("single fuzzy match", func(t *testing.T) {
+		cmd, err := findCmd("proj")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cmd.name != "projects" {
+			t.Fatalf("expected %q, got %q", "projects", cmd.name)
+		}
+	})
+
+	t.Run("no match", func(t *testing.T) {
+		_, err := findCmd("banana")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		expected := `no command match "banana"`
+		if err.Error() != expected {
+			t.Fatalf("expected %q, got %q", expected, err)
+		}
+	})
+
+	t.Run("multiple matches", func(t *testing.T) {
+		_, err := findCmd("st")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		expected := `too many matches to "st": start, status, stop`
+		if err.Error() != expected {
+			t.Fatalf("expected %q, got %q", expected, err)
+		}
+	})
+}
+
 func TestBadReportDate(t *testing.T) {
 	dir := t.TempDir()
 	exe := fmt.Sprintf("%s/%s", dir, "toggl")

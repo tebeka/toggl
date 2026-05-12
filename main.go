@@ -525,14 +525,23 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, `Use "%s <command> -h" for more information about a command.\n`, progName) //#nosec
 }
 
-func findCmd(name string) cmd {
-	for _, c := range cmds {
-		if c.name == name {
-			return c
-		}
+func findCmd(name string) (cmd, error) {
+	commandByName := make(map[string]cmd)
+	names := make([]string, len(cmds))
+	for i, c := range cmds {
+		commandByName[c.name] = c
+		names[i] = c.name
 	}
 
-	return cmd{}
+	matches := fuzzy.Find(name, names)
+	switch len(matches) {
+	case 0:
+		return cmd{}, fmt.Errorf("no command match %q", name)
+	case 1:
+		return commandByName[matches[0]], nil
+	default:
+		return cmd{}, fmt.Errorf("too many matches to %q: %s", name, projectsStr(matches))
+	}
 }
 
 func main() {
@@ -550,8 +559,9 @@ func main() {
 
 	args := os.Args[2:]
 
-	cmd := findCmd(cmdName)
-	if cmd.fn == nil {
+	cmd, err := findCmd(cmdName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		printUsage()
 		os.Exit(1)
 	}
